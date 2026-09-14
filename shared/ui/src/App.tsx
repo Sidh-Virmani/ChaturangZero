@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Board } from './components/Board'
 import { GameSidebar } from './components/GameSidebar'
-import { gameAdapter } from './services/mockGameAdapter'
+import { gameAdapter } from './services/httpGameAdapter'
 import type { BoardState, LegalMove, SquareId } from './types/game'
 
 function App() {
@@ -113,7 +113,7 @@ function App() {
             </span>
           </a>
           <div className="adapter-badge">
-            <span /> Mock game connected
+            <span /> Game core connected
           </div>
         </div>
       </header>

@@ -2,8 +2,8 @@ import type { BoardState, LegalMove, SquareId } from '../types/game'
 
 /**
  * The only boundary the React application uses to communicate with game logic.
- * A future HTTP adapter can implement this interface and delegate every method
- * to the Python game core without changing board components.
+ * The HTTP implementation delegates every operation to the authoritative
+ * Python core; React components never calculate or apply moves themselves.
  */
 export interface GameAdapter {
   getState(): Promise<BoardState>

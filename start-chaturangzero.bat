@@ -18,31 +18,35 @@ if not exist "%UI_DIR%\package.json" (
   exit /b 1
 )
 
+where python >nul 2>&1
+if errorlevel 1 (
+  echo Python is required to run the Chaturanga game core.
+  pause
+  exit /b 1
+)
+
 pushd "%UI_DIR%"
 
 if not exist "node_modules\" (
   echo Installing frontend dependencies...
   call npm install
-  if errorlevel 1 goto :failed
+  if errorlevel 1 (
+    popd
+    goto :failed
+  )
 )
 
-echo Starting ChaturangZero at http://localhost:5173/
+echo Starting ChaturangZero at http://127.0.0.1:5173/
 echo Close this window or press Ctrl+C to stop the application.
 
-rem Future Python backend startup can be added here before the frontend process.
-if defined CHATURANGZERO_NO_OPEN (
-  call npm run dev -- --host 127.0.0.1
-) else (
-  call npm run dev -- --host 127.0.0.1 --open
-)
+popd
+python "%PROJECT_ROOT%run_chaturangzero.py"
 if errorlevel 1 goto :failed
 
-popd
 exit /b 0
 
 :failed
 echo.
 echo ChaturangZero could not be started.
-popd
 pause
 exit /b 1

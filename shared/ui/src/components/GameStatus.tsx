@@ -6,13 +6,14 @@ interface GameStatusProps {
 
 export function GameStatus({ state }: GameStatusProps) {
   const turnName = state.currentTurn === 'white' ? 'Ivory' : 'Onyx'
+  const isTerminal = state.status.code === 'terminal'
 
   return (
     <section className="panel status-card" aria-labelledby="game-status-heading">
       <div className="turn-display">
         <span className={`turn-piece turn-piece--${state.currentTurn}`} aria-hidden="true" />
         <div>
-          <h2 id="game-status-heading">{turnName} to move</h2>
+          <h2 id="game-status-heading">{isTerminal ? 'Game complete' : `${turnName} to move`}</h2>
           <p>{state.status.label}</p>
         </div>
       </div>
