@@ -1,0 +1,23 @@
+# ChaturangZero — Python Requirements
+#
+# Install all at once:
+#   pip install -r requirements.txt
+#
+# For CPU-only PyTorch (smaller download):
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt
+
+# ── Core AI ──────────────────────────────────────────────────────────────────
+torch>=2.0.0
+numpy>=1.24.0
+
+# ── Web API ───────────────────────────────────────────────────────────────────
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.0.0
+
+# ── Visualisation (optional but recommended) ──────────────────────────────────
+matplotlib>=3.7.0
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+pytest>=8.0.0
