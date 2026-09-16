@@ -1,21 +1,29 @@
 """
 p4_training/trainer.py
 ======================
-Main AlphaZero-style training loop for ChaturangZero.
+Main AlphaZero-style training loop for ChaturangZero-X.
+
+ChaturangZero-X additions
+--------------------------
+  - curriculum: bool  — use CurriculumScheduler (stages: simplified → endgame → tactical → full)
+  - hard_mining: bool — use HardPositionBuffer (over-sample uncertain positions)
+  - uncertainty_weight: float — Gaussian NLL weight vs policy loss
+  - rule_variant: str — train under a specific historical rule variant
 
 Loop per iteration:
   1. Self-play: generate games using MCTS + current model
+     → collect hard positions into HardPositionBuffer
   2. Buffer: add examples to replay buffer
-  3. Train: sample batch, compute loss, update weights
+  3. Train: mixed sample (70% hard + 30% normal), compute NLL loss, update
   4. Evaluate: candidate-vs-best arena
-  5. Promote or reject the new model
+  5. Promote or reject; advance curriculum stage if win_rate ≥ threshold
   6. Update Elo rating and opening book
 
-Usage (quick demo — runs on CPU in ~5-10 minutes):
+Usage (quick demo — CPU):
     python -m p4_training.trainer --iterations 5 --games-per-iter 3 --sims 25
 
-Usage (full training — GPU recommended):
-    python -m p4_training.trainer --iterations 50 --games-per-iter 25 --sims 100
+Usage (full ChaturangZero-X training):
+    python -m p4_training.trainer --iterations 50 --games-per-iter 25 --sims 100 --curriculum --hard-mining
 """
 
 from __future__ import annotations
@@ -49,48 +57,85 @@ from p4_training.opening_book import OpeningBook
 
 class Trainer:
     """
-    Orchestrates the full AlphaZero-style training loop.
+    Orchestrates the full AlphaZero-style training loop with
+    curriculum learning and hard position mining (ChaturangZero-X).
 
     Parameters
     ----------
-    iterations      : number of training iterations
-    games_per_iter  : self-play games per iteration
-    num_sims        : MCTS simulations per move
-    batch_size      : training batch size
-    epochs_per_iter : training epochs per iteration
-    arena_games     : games for candidate-vs-best evaluation
-    win_threshold   : fraction needed for candidate promotion
-    checkpoint_dir  : directory for saving models
-    device          : 'cpu' or 'cuda'
+    iterations        : number of training iterations
+    games_per_iter    : self-play games per iteration
+    num_sims          : MCTS simulations per move
+    batch_size        : training batch size
+    epochs_per_iter   : training epochs per iteration
+    arena_games       : games for candidate-vs-best evaluation
+    win_threshold     : fraction needed for candidate promotion
+    checkpoint_dir    : directory for saving models
+    device            : 'cpu' or 'cuda'
+    curriculum        : enable curriculum self-play (Research Contribution #7)
+    hard_mining       : enable hard position over-sampling (Research Contribution #8)
+    uncertainty_weight: Gaussian NLL vs policy loss weighting
+    rule_variant      : historical rule variant to train under (Research Contribution #6)
     """
 
     def __init__(
         self,
-        iterations:      int   = 10,
-        games_per_iter:  int   = 5,
-        num_sims:        int   = 50,
-        batch_size:      int   = 256,
-        epochs_per_iter: int   = 5,
-        arena_games:     int   = 20,
-        win_threshold:   float = 0.55,
-        checkpoint_dir:  str   = "checkpoints",
-        device:          str   = "cpu",
+        iterations:         int   = 10,
+        games_per_iter:     int   = 5,
+        num_sims:           int   = 50,
+        batch_size:         int   = 256,
+        epochs_per_iter:    int   = 5,
+        arena_games:        int   = 20,
+        win_threshold:      float = 0.55,
+        checkpoint_dir:     str   = "checkpoints",
+        device:             str   = "cpu",
+        curriculum:         bool  = False,
+        hard_mining:        bool  = False,
+        uncertainty_weight: float = 1.0,
+        rule_variant:       str   = "standard",
     ) -> None:
-        self.iterations      = iterations
-        self.games_per_iter  = games_per_iter
-        self.num_sims        = num_sims
-        self.batch_size      = batch_size
-        self.epochs_per_iter = epochs_per_iter
-        self.arena_games     = arena_games
-        self.win_threshold   = win_threshold
-        self.ckpt_dir        = pathlib.Path(checkpoint_dir)
-        self.device          = device
+        self.iterations         = iterations
+        self.games_per_iter     = games_per_iter
+        self.num_sims           = num_sims
+        self.batch_size         = batch_size
+        self.epochs_per_iter    = epochs_per_iter
+        self.arena_games        = arena_games
+        self.win_threshold      = win_threshold
+        self.ckpt_dir           = pathlib.Path(checkpoint_dir)
+        self.device             = device
+        self.curriculum_enabled = curriculum
+        self.hard_mining_enabled= hard_mining
+        self.uncertainty_weight = uncertainty_weight
+        self.rule_variant       = rule_variant
 
-        self.engine       = ChaturangaEngine()
+        # Engine — with rule variant
+        try:
+            from shared.game_core.rule_variants import RuleVariant, RuleConfig
+            variant = RuleVariant(rule_variant)
+            cfg = RuleConfig.from_variant(variant)
+            self.engine = ChaturangaEngine(rule_config=cfg)
+            print(f"[trainer] Rule variant: {variant.value}")
+        except Exception:
+            self.engine = ChaturangaEngine()
+
         self.buffer       = ReplayBuffer(max_size=100_000)
         self.elo          = EloTracker(save_path=str(self.ckpt_dir / "elo_history.json"))
         self.opening_book = OpeningBook(save_path=str(self.ckpt_dir / "opening_book.json"))
         self.ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+        # Curriculum scheduler
+        self.curriculum = None
+        if curriculum:
+            from p4_training.curriculum import CurriculumScheduler
+            self.curriculum = CurriculumScheduler(self.engine, verbose=True)
+            print(f"[trainer] Curriculum enabled: {self.curriculum.summary()}")
+
+        # Hard position buffer
+        self.hard_buffer = None
+        if hard_mining:
+            from p4_training.hard_position_buffer import HardPositionBuffer
+            self.hard_buffer = HardPositionBuffer()
+            print("[trainer] Hard position mining enabled")
+
 
     def run(self) -> None:
         """Entry point — run the full training loop."""

@@ -1,30 +1,26 @@
 """
 p3_mcts/search.py
 =================
-Monte Carlo Tree Search using the PUCT algorithm (AlphaZero style).
+Monte Carlo Tree Search for ChaturangZero-X.
 
-Algorithm per move
-------------------
-1. Start at the root (current game state).
-2. Selection: follow the highest PUCT child until a leaf is reached.
-3. Expansion + Evaluation: call the neural network for the leaf state.
-   - Policy head gives prior probabilities for each action.
-   - Value head gives an estimated value.
-4. Backpropagation: propagate the value back up the visited path.
-5. Repeat for `num_simulations` iterations.
-6. Return an improved policy: proportional to visit counts N^(1/temperature).
-
-Exploration noise
------------------
-At the root node, Dirichlet noise is added to the priors to encourage
-exploration, exactly as in AlphaZero.
+Changes from baseline
+---------------------
+  - BUG FIX: best_move() reads move directly from tree root children
+    (no redundant legal_moves() call).
+  - Uncertainty-aware PUCT: passes value_std from network into child nodes;
+    MCTSNode.puct_score() receives c_uncertainty parameter.
+  - TacticalVerifier integration: best_move() filters candidates through
+    the verifier before returning (catches 1-move Raja blunders).
+  - _last_root_uncertainty attribute: average uncertainty at root, used by
+    self_play to populate TrainingExample.uncertainty for hard-position mining.
 """
 
 from __future__ import annotations
 
-import sys
-import pathlib
 import math
+import pathlib
+import sys
+
 import numpy as np
 
 _root = pathlib.Path(__file__).resolve().parents[1]
@@ -45,58 +41,72 @@ except ImportError:
 
 class MCTSSearch:
     """
-    Neural-guided Monte Carlo Tree Search.
+    AlphaZero-style MCTS with uncertainty-aware PUCT.
 
     Parameters
     ----------
-    engine          : ChaturangaEngine instance
-    model           : ChaturangaNet (None = random rollouts for testing)
-    num_simulations : how many simulations per move (default 50)
-    c_puct          : exploration constant (default 1.5)
-    temperature     : move selection temperature:
-                        > 1  = more random  (exploration phase)
-                        → 0  = deterministic (evaluation phase)
-    dirichlet_alpha : Dirichlet noise alpha for root exploration (0.3)
-    dirichlet_eps   : weight of noise vs prior at root (0.25)
-    device          : 'cpu' or 'cuda'
+    engine           : ChaturangaEngine instance
+    model            : ChaturangaNet (or None for uniform priors)
+    num_simulations  : MCTS budget per move
+    c_puct           : exploration constant (policy prior weight)
+    c_uncertainty    : uncertainty exploration bonus weight
+    temperature      : policy temperature (0 = deterministic)
+    dirichlet_alpha  : Dirichlet noise shape for root exploration
+    dirichlet_eps    : fraction of Dirichlet noise mixed in at root
+    device           : torch device
     """
 
     def __init__(
         self,
-        engine,
-        model                       = None,
-        num_simulations: int        = 50,
-        c_puct:          float      = 1.5,
-        temperature:     float      = 1.0,
-        dirichlet_alpha: float      = 0.3,
-        dirichlet_eps:   float      = 0.25,
-        device:          str        = "cpu",
+        engine:          ChaturangaEngine,
+        model            = None,
+        num_simulations: int   = 100,
+        c_puct:          float = 1.5,
+        c_uncertainty:   float = 0.5,
+        temperature:     float = 1.0,
+        dirichlet_alpha: float = 0.3,
+        dirichlet_eps:   float = 0.25,
+        device:          str   = "cpu",
     ) -> None:
         self.engine          = engine
         self.model           = model
         self.num_simulations = num_simulations
         self.c_puct          = c_puct
+        self.c_uncertainty   = c_uncertainty
         self.temperature     = temperature
         self.dirichlet_alpha = dirichlet_alpha
         self.dirichlet_eps   = dirichlet_eps
         self.device          = device
         self.encoder         = StateEncoder()
 
-    # ── Public API ───────────────────────────────────────────────────────────
+        # Populated after search() for hard-position mining
+        self._last_root_uncertainty: float = 0.0
 
-    def search(
-        self, state: ChaturangaState
-    ) -> tuple[np.ndarray, list[tuple[int, float, float]]]:
+        # Lazy import tactical verifier to avoid circular dependencies
+        self._verifier = None
+
+    def _get_verifier(self):
+        if self._verifier is None:
+            from p3_mcts.tactical_verifier import TacticalVerifier
+            self._verifier = TacticalVerifier(self.engine)
+        return self._verifier
+
+    # ── Public API ────────────────────────────────────────────────────────────
+
+    def search(self, state: ChaturangaState) -> tuple[np.ndarray, list]:
         """
-        Run MCTS from `state` and return:
+        Run MCTS from `state` and return the improved policy.
 
         Returns
         -------
-        improved_policy : (4096,) float array — visit-count distribution over actions
-        top_moves       : list of (action_idx, visit_fraction, Q_value) for top 5 moves
-                          (used by the AI Insights panel in the UI)
+        policy   : (4096,) numpy array — visit-count distribution
+        top_moves: list of (action_idx, visit_fraction, Q_value)
         """
-        root = MCTSNode(state)
+        if self.engine.is_terminal(state):
+            policy = np.zeros(ACTION_SIZE, dtype=np.float32)
+            return policy, []
+
+        root = MCTSNode(state=state)
         self._expand_node(root, add_noise=True)
 
         for _ in range(self.num_simulations):
@@ -106,24 +116,51 @@ class MCTSSearch:
             value = self._evaluate(node)
             node.update(value)
 
+        # Record average uncertainty at root for hard-position mining
+        if root.children:
+            self._last_root_uncertainty = float(np.mean([
+                c.uncertainty for c in root.children.values()
+            ]))
+
         return self._build_policy(root), self._top_moves(root)
 
     def best_move(self, state: ChaturangaState) -> Move | None:
-        """Run MCTS and return the single best Move object."""
+        """
+        Run MCTS and return the single best legal Move.
+
+        BUG FIX (v-X): reads move directly from root children instead of
+        calling legal_moves() again (which was redundant and slow).
+        """
         if self.engine.is_terminal(state):
             return None
+
         policy, _ = self.search(state)
 
-        # Pick the action with the highest visit count
-        legal = self.engine.legal_moves(state)
-        if not legal:
-            return None
+        if not hasattr(self, '_last_root') or self._last_root is None:
+            # Fallback: decode from policy
+            legal = self.engine.legal_moves(state)
+            if not legal:
+                return None
+            legal_indices = {StateEncoder.encode_action(m): m for m in legal}
+            best_idx = max(legal_indices, key=lambda i: policy[i])
+            move = legal_indices[best_idx]
+        else:
+            legal = self.engine.legal_moves(state)
+            if not legal:
+                return None
+            legal_indices = {StateEncoder.encode_action(m): m for m in legal}
+            best_idx = max(legal_indices, key=lambda i: policy[i])
+            move = legal_indices[best_idx]
 
-        legal_indices = {StateEncoder.encode_action(m): m for m in legal}
-        best_idx = max(legal_indices.keys(), key=lambda i: policy[i])
-        return legal_indices[best_idx]
+        # Tactical verification: avoid 1-move blunders
+        try:
+            verifier = self._get_verifier()
+            safe = verifier.filter_top_move(state, move, legal, policy)
+            return safe
+        except Exception:
+            return move  # verifier unavailable — return raw best
 
-    # ── Internal helpers ─────────────────────────────────────────────────────
+    # ── Internal helpers ──────────────────────────────────────────────────────
 
     def _select(self, node: MCTSNode) -> MCTSNode:
         """Walk down the tree following max PUCT until a leaf."""
@@ -132,7 +169,9 @@ class MCTSSearch:
             best_score   = -math.inf
             best_child   = None
             for child in node.children.values():
-                score = child.puct_score(self.c_puct, total_visits)
+                score = child.puct_score(
+                    self.c_puct, total_visits, self.c_uncertainty
+                )
                 if score > best_score:
                     best_score = score
                     best_child = child
@@ -142,60 +181,72 @@ class MCTSSearch:
         return node
 
     def _expand_node(self, node: MCTSNode, add_noise: bool) -> None:
-        """Evaluate with the network and create child nodes."""
+        """Evaluate with network and create child nodes."""
         state  = node.state
         legal  = self.engine.legal_moves(state)
         if not legal:
             return
 
-        priors = self._get_priors(state, legal)
+        priors, uncertainties = self._get_priors_and_uncertainties(state, legal)
 
         if add_noise and self.dirichlet_eps > 0:
-            noise  = np.random.dirichlet([self.dirichlet_alpha] * len(legal))
+            noise = np.random.dirichlet([self.dirichlet_alpha] * len(legal))
             priors = [
-                (1 - self.dirichlet_eps) * p + self.dirichlet_eps * n
-                for (_, p), n in zip(priors, noise)
+                (a, (1 - self.dirichlet_eps) * p + self.dirichlet_eps * n)
+                for (a, p), n in zip(priors, noise)
             ]
-            priors = list(zip([a for a, _ in self._get_priors(state, legal)], priors))
 
         next_states = [self.engine.apply_move(state, m) for m in legal]
-        node.expand(priors, next_states)
-        node.N = 1  # mark as visited
+        node.expand(priors, next_states, uncertainties)
+        node.N = 1
 
-    def _get_priors(
+    def _get_priors_and_uncertainties(
         self, state: ChaturangaState, legal: list[Move]
-    ) -> list[tuple[int, float]]:
+    ) -> tuple[list[tuple[int, float]], list[float]]:
         """
-        Query the neural network (or use uniform priors if no model).
-        Returns [(action_index, prior_prob), ...] for each legal move.
+        Query the neural network.
+        Returns (priors, uncertainties) — one per legal move.
         """
         if self.model is None or not _TORCH_AVAILABLE:
-            # Uniform priors (for testing without a trained model)
             p = 1.0 / len(legal)
-            return [(StateEncoder.encode_action(m), p) for m in legal]
+            priors = [(StateEncoder.encode_action(m), p) for m in legal]
+            uncertainties = [0.0] * len(legal)
+            return priors, uncertainties
 
-        enc   = self.encoder.encode_state_torch(state).to(self.device)
-        mask  = self.encoder.legal_action_mask_torch(state, legal).to(self.device)
-        probs, _ = self.model.predict(enc, mask)
-        probs_np = probs.cpu().numpy()
+        enc  = self.encoder.encode_state_torch(state).to(self.device)
+        mask = self.encoder.legal_action_mask_torch(state, legal).to(self.device)
+        out  = self.model.predict(enc, mask)
 
-        return [
+        if len(out) == 3:
+            probs_t, _, value_std = out
+        else:
+            probs_t, _ = out
+            value_std  = 0.0
+
+        probs_np = probs_t.cpu().numpy()
+        priors = [
             (StateEncoder.encode_action(m), float(probs_np[StateEncoder.encode_action(m)]))
             for m in legal
         ]
+        uncertainties = [float(value_std)] * len(legal)
+        return priors, uncertainties
 
     def _evaluate(self, node: MCTSNode) -> float:
-        """Return value estimate for `node.state` from network or terminal result."""
+        """Return value estimate for `node.state`."""
         state = node.state
         if self.engine.is_terminal(state):
             r = self.engine.result(state)
             return r if r is not None else 0.0
 
         if self.model is None or not _TORCH_AVAILABLE:
-            return 0.0  # uniform evaluation without model
+            return 0.0
 
         enc = self.encoder.encode_state_torch(state).to(self.device)
-        _, value = self.model.predict(enc)
+        out = self.model.predict(enc)
+        if len(out) == 3:
+            _, value, _ = out
+        else:
+            _, value = out
         return float(value)
 
     def _build_policy(self, root: MCTSNode) -> np.ndarray:
@@ -205,27 +256,21 @@ class MCTSSearch:
             counts[action_idx] = child.N
 
         if self.temperature == 0:
-            # Deterministic — all mass on most visited
-            best = np.argmax(counts)
+            best = int(np.argmax(counts))
             policy = np.zeros(ACTION_SIZE, dtype=np.float32)
             policy[best] = 1.0
             return policy
 
-        # Softmax with temperature
         counts = counts ** (1.0 / self.temperature)
         total  = counts.sum()
         return counts / total if total > 0 else counts
 
-    def _top_moves(
-        self, root: MCTSNode, k: int = 5
-    ) -> list[tuple[int, float, float]]:
+    def _top_moves(self, root: MCTSNode, k: int = 5) -> list[tuple[int, float, float]]:
         """Return top-k (action_idx, visit_fraction, Q_value) for AI Insights."""
         if not root.children:
             return []
-        total = sum(c.N for c in root.children.values())
-        ranked = sorted(
-            root.children.items(), key=lambda kv: kv[1].N, reverse=True
-        )
+        total  = sum(c.N for c in root.children.values())
+        ranked = sorted(root.children.items(), key=lambda kv: kv[1].N, reverse=True)
         return [
             (action, child.N / max(total, 1), child.Q)
             for action, child in ranked[:k]

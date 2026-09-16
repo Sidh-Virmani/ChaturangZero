@@ -15,6 +15,12 @@ status update cycle.
   legal_moves        — calls _make_move_pieces + is_in_check (no recursion)
   _has_legal_move    — same: _make_move_pieces + is_in_check (no recursion)
   _apply_move_unchecked → _update_status → _has_legal_move  (terminates)
+
+ChaturangZero-X addition
+-------------------------
+  rule_config: RuleConfig — plug in different historical rule variants
+  (R1 standard, R2 capture-Raja, R3 bare-Raja, R4 no-stalemate).
+  See shared/game_core/rule_variants.py.
 """
 
 from __future__ import annotations
@@ -33,22 +39,38 @@ from .state import (
 )
 from .rules import is_in_check, pseudolegal_moves
 
+try:
+    from .rule_variants import RuleConfig
+except ImportError:
+    RuleConfig = None   # type: ignore
+
 
 _HALFMOVE_DRAW_LIMIT = 100  # 50-move rule (each side counts as 1 half-move)
 
 
 class ChaturangaEngine:
-    """Stateless Chaturanga game engine."""
+    """
+    Stateless Chaturanga game engine.
 
-    # ------------------------------------------------------------------ #
-    # Game lifecycle
-    # ------------------------------------------------------------------ #
+    Parameters
+    ----------
+    rule_config : RuleConfig or None
+        If None, uses standard rules (checkmate wins, stalemate draws).
+        Pass a RuleConfig to activate one of the historical rule variants.
+    """
+
+    def __init__(self, rule_config=None) -> None:
+        if rule_config is None and RuleConfig is not None:
+            self.rule_config = RuleConfig.standard()
+        else:
+            self.rule_config = rule_config
 
     def new_game(self) -> ChaturangaState:
         return initial_state()
 
     def clone(self, state: ChaturangaState) -> ChaturangaState:
         return copy.deepcopy(state)
+
 
     # ------------------------------------------------------------------ #
     # Shared piece-move primitive (no ChaturangaState creation)
@@ -168,34 +190,58 @@ class ChaturangaEngine:
         """
         Determine the game status after a move has been applied.
 
-        Calls only _has_legal_move (safe) — never legal_moves (would recurse).
+        Respects self.rule_config for historical rule variants:
+          R3 (bare_raja_loses)  : only-Raja left = loss
+          R4 (stalemate_is_loss): stalemate = loss (not draw)
         """
         current   = state.current_turn
         in_check  = is_in_check(current, state)
         has_moves = self._has_legal_move(state)
+        cfg       = self.rule_config
 
+        # ── Bare-Raja condition (R3) ──────────────────────────────────────────
+        if cfg is not None and cfg.bare_raja_loses:
+            own_pieces = state.pieces_of(current)
+            if len(own_pieces) == 1 and own_pieces[0].kind.value == "raja":
+                # Only Raja left — count as loss unless opponent also bare
+                opp_pieces = state.pieces_of(current.opponent())
+                if len(opp_pieces) > 1:
+                    return ChaturangaState(
+                        pieces=state.pieces,
+                        current_turn=current,
+                        move_history=state.move_history,
+                        halfmove_clock=state.halfmove_clock,
+                        status="checkmate",        # reuse terminal status
+                        winner=current.opponent().value,
+                    )
+
+        # ── No legal moves ────────────────────────────────────────────────────
         if not has_moves:
             if in_check:
-                winner = current.opponent().value
+                # Standard checkmate
                 return ChaturangaState(
                     pieces=state.pieces,
                     current_turn=current,
                     move_history=state.move_history,
                     halfmove_clock=state.halfmove_clock,
                     status="checkmate",
-                    winner=winner,
+                    winner=current.opponent().value,
                 )
             else:
+                # Stalemate — R4: counts as loss; else draw
+                stalemate_is_loss = (cfg is not None and cfg.stalemate_is_loss)
                 return ChaturangaState(
                     pieces=state.pieces,
                     current_turn=current,
                     move_history=state.move_history,
                     halfmove_clock=state.halfmove_clock,
-                    status="draw",
-                    winner="draw",
+                    status="checkmate" if stalemate_is_loss else "draw",
+                    winner=current.opponent().value if stalemate_is_loss else "draw",
                 )
 
-        if state.halfmove_clock >= _HALFMOVE_DRAW_LIMIT:
+        # ── 50-move (halfmove) draw ───────────────────────────────────────────
+        limit = cfg.halfmove_limit if cfg is not None else _HALFMOVE_DRAW_LIMIT
+        if state.halfmove_clock >= limit:
             return ChaturangaState(
                 pieces=state.pieces,
                 current_turn=current,
@@ -214,6 +260,7 @@ class ChaturangaEngine:
             status=status_code,
             winner=None,
         )
+
 
     # ------------------------------------------------------------------ #
     # Terminal queries

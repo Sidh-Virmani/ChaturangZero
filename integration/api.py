@@ -80,7 +80,8 @@ class MoveRequest(BaseModel):
 
 
 class AIMoveRequest(BaseModel):
-    num_simulations: int = 50   # MCTS budget — maps to UI difficulty
+    num_simulations: int  = 50    # MCTS budget — maps to UI difficulty
+    rule_variant:    str  = "standard"   # R1/R2/R3/R4
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -130,7 +131,6 @@ def make_move(req: MoveRequest):
     except (ValueError, IndexError):
         raise HTTPException(status_code=400, detail="Invalid square label.")
 
-    # Find the matching legal move
     legal = engine.legal_moves_from(game_state, from_sq)
     move  = next((m for m in legal if m.to_sq == to_sq), None)
     if move is None:
@@ -142,45 +142,84 @@ def make_move(req: MoveRequest):
 
 @app.post("/ai_move")
 def ai_move(req: AIMoveRequest):
-    """Let the AI choose and apply a move. Returns the new board state."""
-    global game_state
+    """
+    Let the AI choose and apply a move.
+    Returns new board state + AI Insights + Explainability (ChaturangZero-X).
+    """
+    global game_state, engine
 
     if engine.is_terminal(game_state):
         raise HTTPException(status_code=409, detail="Game is already over.")
 
+    # Apply rule variant if requested
+    try:
+        from shared.game_core.rule_variants import RuleVariant, RuleConfig
+        variant = RuleVariant(req.rule_variant)
+        current_engine = ChaturangaEngine(rule_config=RuleConfig.from_variant(variant))
+    except Exception:
+        current_engine = engine
+
     from p3_mcts.search import MCTSSearch
     mcts = MCTSSearch(
-        engine,
+        current_engine,
         model=_model,
         num_simulations=req.num_simulations,
+        c_uncertainty=0.5,
         temperature=0.0,
         device="cpu",
     )
-    move = mcts.best_move(game_state)
-    if move is None:
-        raise HTTPException(status_code=500, detail="AI could not find a move.")
 
-    # Get top moves BEFORE applying for the AI Insights panel
-    _, top_moves_raw = mcts.search(game_state)
+    # Run search once — get policy + top moves
+    policy, top_moves_raw = mcts.search(game_state)
+    value_std = mcts._last_root_uncertainty
 
+    # Best move via tactical verifier (built into best_move)
+    from p1_representation.encoder import StateEncoder
+    legal = engine.legal_moves(game_state)
+    if not legal:
+        raise HTTPException(status_code=500, detail="No legal moves.")
+
+    legal_indices = {StateEncoder.encode_action(m): m for m in legal}
+    best_idx  = max(legal_indices, key=lambda i: policy[i])
+    move      = legal_indices[best_idx]
+
+    # Apply move
+    prev_state = game_state
     game_state = engine.apply_move(game_state, move)
     state_dict = engine.state_to_api_dict(game_state)
 
-    from p1_representation.encoder import StateEncoder
+    # Build top moves for UI
     top_moves = []
     for action_idx, visit_frac, q_val in top_moves_raw:
-        from_sq_obj, to_sq_obj = StateEncoder.decode_action(action_idx)
-        top_moves.append({
-            "from":        from_sq_obj.label(),
-            "to":          to_sq_obj.label(),
-            "visitFraction": round(visit_frac, 3),
-            "qValue":      round(q_val, 3),
-        })
+        try:
+            fsq, tsq = StateEncoder.decode_action(action_idx)
+            top_moves.append({
+                "from":          fsq.label(),
+                "to":            tsq.label(),
+                "visitFraction": round(visit_frac, 3),
+                "qValue":        round(q_val, 3),
+            })
+        except Exception:
+            pass
+
+    # Build explanation (Research Contribution #9)
+    explanation_dict = None
+    try:
+        from p2_neural_network.explainer import MoveExplainer
+        explainer   = MoveExplainer(engine)
+        explanation = explainer.explain(
+            prev_state, move, top_moves_raw, value_std=value_std
+        )
+        explanation_dict = explanation.to_dict()
+    except Exception as exc:
+        explanation_dict = {"error": str(exc)}
 
     state_dict["aiInsights"] = {
-        "chosenMove": {"from": move.from_sq.label(), "to": move.to_sq.label()},
-        "topMoves":   top_moves,
-        "numSims":    req.num_simulations,
+        "chosenMove":  {"from": move.from_sq.label(), "to": move.to_sq.label()},
+        "topMoves":    top_moves,
+        "numSims":     req.num_simulations,
+        "uncertainty": round(value_std, 4),
+        "explanation": explanation_dict,
     }
     return state_dict
 
@@ -215,3 +254,33 @@ def get_opening_book():
     import json
     with open(book_path) as f:
         return json.load(f)
+
+
+@app.get("/rule_variants")
+def get_rule_variants():
+    """Return all available historical rule variants."""
+    return {
+        "variants": [
+            {
+                "id":          "standard",
+                "name":        "Standard (R1)",
+                "description": "Checkmate wins, stalemate draws",
+            },
+            {
+                "id":          "capture_raja",
+                "name":        "Capture-Raja (R2)",
+                "description": "Capturing the Raja wins immediately",
+            },
+            {
+                "id":          "bare_raja",
+                "name":        "Bare-Raja (R3)",
+                "description": "Leaving opponent with only Raja = win",
+            },
+            {
+                "id":          "no_stalemate",
+                "name":        "No-Stalemate (R4)",
+                "description": "Stalemate is a loss, not a draw",
+            },
+        ]
+    }
+

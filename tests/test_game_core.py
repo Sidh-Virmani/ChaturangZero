@@ -201,28 +201,19 @@ def test_no_check_detection():
 
 
 def test_pinned_piece_cannot_move(engine):
-    """A piece pinned to the Raja by a Ratha must not be able to move away from the pin line."""
-    # White Raja at e1 (4,0), White Padati at e2 (4,1), Black Ratha at e8 (4,7)
-    # The Padati IS on the pin line (same file), but moving e2→e3 keeps blocking the Ratha.
-    # So the padati can move to e3 (still blocks). But it cannot move diagonally to f3 or d3.
-    # Let's construct a true pin: diagonal pin.
-    # White Raja at e1 (4,0), White Padati at f2 (5,1), Black Ashva at g3 (6,2) — no, Ashva doesn't create a pin.
-    # Real pin: Ratha at e8 attacks Raja at e1 via the e-file. Padati at e2 BLOCKS it.
-    # Moving padati to e3 still blocks → padati is NOT pinned, it can move along e-file.
-    # For a true pin: use a DIFFERENT file piece.
-    # White Raja at e1, White Padati at f2, Black Ratha at f8 — padati at f2 is pinned by Ratha at f8
-    # Padati can only move forward (f3) which still blocks. It cannot capture sideways (e3,g3) unless an enemy is there.
-    # Actually, f2→f3 is allowed since it stays on the pin line. f2→e3 would expose king → illegal.
-    # Let's test that f2 cannot capture diagonally when pinned:
-    raja    = Piece(PieceKind.RAJA,   Side.WHITE, Square(4, 0))   # e1
-    padati  = Piece(PieceKind.PADATI, Side.WHITE, Square(5, 1))   # f2
-    enemy_e3 = Piece(PieceKind.PADATI, Side.BLACK, Square(4, 2))  # e3 (diagonal capture target)
-    ratha   = Piece(PieceKind.RATHA,  Side.BLACK, Square(5, 7))   # f8 (pins padati on f-file)
-    state   = ChaturangaState(pieces=[raja, padati, enemy_e3, ratha], current_turn=Side.WHITE)
+    """A piece absolutely pinned to the Raja cannot legally move."""
+    # Pin scenario: White Raja at a1 (0,0), White Ratha at b1 (1,0) blocks Black Ratha at h1 (7,0)
+    # The White Ratha at b1 is pinned horizontally — it cannot leave the 1st rank.
+    # If Ratha moves vertically (b1→b2) it exposes the White Raja to Black Ratha at h1.
+    w_raja  = Piece(PieceKind.RAJA,  Side.WHITE, Square(0, 0))  # a1
+    w_ratha = Piece(PieceKind.RATHA, Side.WHITE, Square(1, 0))  # b1  (pinned piece)
+    b_ratha = Piece(PieceKind.RATHA, Side.BLACK, Square(7, 0))  # h1  (pinner)
+    state   = ChaturangaState(pieces=[w_raja, w_ratha, b_ratha], current_turn=Side.WHITE)
     legal   = engine.legal_moves(state)
-    # Pinned padati at f2 — can move to f3 (stays on pin line) but CANNOT capture at e3 (would expose king)
-    diagonal_captures = [m for m in legal if m.from_sq == Square(5, 1) and m.to_sq == Square(4, 2)]
-    assert len(diagonal_captures) == 0, "Pinned padati must not be able to make a diagonal capture that exposes the king"
+    # Pinned Ratha at b1 can only slide along rank 1 (a1 blocked by own king, c1-g1 ok, h1 captures)
+    # It must NOT be able to leave rank 1 (e.g. go to b2, b3, etc.)
+    vertical_moves = [m for m in legal if m.from_sq == Square(1, 0) and m.to_sq.rank != 0]
+    assert len(vertical_moves) == 0, "Pinned Ratha must not leave the pin line"
 
 
 def test_apply_move_updates_turn(engine, start):
