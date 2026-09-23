@@ -284,3 +284,65 @@ def get_rule_variants():
         ]
     }
 
+
+class MovesRequest(BaseModel):
+    moves: list[str]  # e.g. ["e2e4", "e7e5"]
+
+@app.post("/infer_rules")
+def infer_rules(req: MovesRequest):
+    """
+    Given a sequence of moves, infer the most likely historical rule variant.
+    (Research Contribution A)
+    """
+    from p6_rule_inference.bayesian_classifier import BayesianRuleClassifier
+    from shared.game_core.rule_variants import RuleVariant
+    
+    # We create a new classifier per request for now, or you could make it global
+    classifier = BayesianRuleClassifier()
+    # In a real app we'd load 4 separate trained models, here we reuse _model
+    for v in ["standard", "capture_raja", "bare_raja", "no_stalemate"]:
+        classifier.add_model(RuleVariant(v), _model)
+        
+    try:
+        probs = classifier.infer_rules(req.moves)
+        return {"posterior_probabilities": probs}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/strategy_dna")
+def get_strategy_dna(req: MovesRequest):
+    """
+    Extract the Strategy DNA fingerprint from a sequence of moves.
+    (Research Contribution C)
+    """
+    from p6_rule_inference.strategy_dna import extract_game_dna
+    try:
+        dna = extract_game_dna(req.moves, engine)
+        return {"dna_fingerprint": dna.tolist()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/game_quality")
+def optimize_game_quality():
+    """
+    Run a mini-batch of the Neural Game Quality Optimizer.
+    (Research Contribution D)
+    """
+    from p6_rule_inference.game_quality_optimizer import GameQualityOptimizer
+    try:
+        optimizer = GameQualityOptimizer(model=_model, num_sims=5)
+        # Using a small number of games for API speed
+        best_report = optimizer.optimize(n_games_per_config=2, verbose=False)
+        leaderboard = optimizer.get_leaderboard()
+        
+        return {
+            "best_variant": best_report.rule_variant,
+            "best_quality_score": best_report.quality_score,
+            "leaderboard": [{"variant": v, "score": s} for v, s in leaderboard]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
