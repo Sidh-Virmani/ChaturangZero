@@ -1,5 +1,10 @@
 # ChaturangZero Architecture & Team Plan
 
+> Original design proposal. The implemented system, setup instructions, and
+> measured results are documented in [README.md](README.md),
+> [docs/MODEL_CARD.md](docs/MODEL_CARD.md), and
+> [docs/COMPLETION_AUDIT.md](docs/COMPLETION_AUDIT.md).
+
 This document explains the project structure in plain language so that any teammate — or any coding assistant such as Codex or Claude — can understand what each module is responsible for, how the modules connect, and what should be built first.
 
 ## 1. High-level idea

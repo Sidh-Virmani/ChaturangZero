@@ -1,5 +1,10 @@
 # P1 representation: the bridge between Chaturanga and numbers
 
+> Historical development report. It describes the original P1 prototype and
+> its API. The current delivered encoder uses **14** input planes and a
+> 4,096-action index; see the root README and `docs/MODEL_CARD.md` for the
+> current implementation.
+
 ## 1. What problem does P1 solve?
 
 `shared/game_core` knows the game. Its `GameState` says which pieces occupy which squares and whose turn it is. Its `Move` says where a piece starts and where it goes. Its `legal_moves(state)` function knows the rules and returns only moves that are allowed.

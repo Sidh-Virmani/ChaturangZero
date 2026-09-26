@@ -7,12 +7,12 @@ venv/
 
 # Python cache
 __pycache__/
-.pytest_cache/
 *.pyc
 *.pyo
 
 # IDE
 .vscode/
+.claude/
 
 # Environment/secrets
 .env
@@ -32,3 +32,19 @@ checkpoints/*
 # OS
 .DS_Store
 Thumbs.db
+
+# Frontend dependencies and build cache
+node_modules/
+shared/ui/dist/
+*.tsbuildinfo
+
+# Local process logs and release bundles
+output/runtime/
+output/releases/
+output/verification/
+
+# Include the small, reproducible demo artifacts with the project.
+!checkpoints/best.pt
+!checkpoints/candidate.pt
+!data/training_metrics.json
+!data/evaluation_report.json

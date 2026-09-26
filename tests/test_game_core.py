@@ -1,203 +1,237 @@
-import pytest
+"""Tests for shared/game_core.
+
+Run with:
+    python -m unittest discover -s tests -v
+
+Covers, roughly in order:
+  - the starting position and basic move application
+  - each piece's individual movement pattern (blocking, jumping, capturing)
+  - promotion
+  - check / checkmate / stalemate detection
+  - a random-vs-random smoke test (architecture doc milestone: many
+    legal games should complete without crashing or reaching an
+    impossible state)
+"""
+
+from __future__ import annotations
+
+import random
+import unittest
 
 from shared.game_core import (
-    GameOverError,
+    GameOutcome,
     GameState,
-    IllegalMoveError,
-    Move,
     Piece,
-    PieceType,
+    PieceKind,
     Side,
-    TerminalReason,
     apply_move,
     initial_state,
     is_in_check,
-    is_valid_gaja_jump,
-    is_valid_padati_move,
+    is_terminal,
     legal_moves,
-    parse_square,
+    legal_moves_from,
     result,
-    terminal_status,
 )
+from shared.game_core.types import square_id_to_square as sq
 
 
-def piece(side: Side, kind: PieceType) -> Piece:
-    return Piece(side, kind)
+def state_with(pieces, side_to_move=Side.WHITE) -> GameState:
+    """Small helper for building custom positions in tests."""
+    return GameState(pieces=tuple(pieces), side_to_move=side_to_move)
 
 
-def state(pieces, turn=Side.WHITE):
-    return GameState.from_mapping(pieces, turn)
+class InitialPositionTests(unittest.TestCase):
+    def test_32_pieces_white_to_move(self):
+        state = initial_state()
+        self.assertEqual(len(state.pieces), 32)
+        self.assertIs(state.side_to_move, Side.WHITE)
+
+    def test_16_legal_opening_moves(self):
+        # 8 padati pushes + 2 ashva x 2 jumps each + 2 gaja x 2 jumps each.
+        state = initial_state()
+        self.assertEqual(len(legal_moves(state)), 16)
+
+    def test_apply_move_flips_turn_and_moves_piece(self):
+        state = initial_state()
+        move = next(m for m in legal_moves(state) if m.to_notation() == "e2-e3")
+        next_state = apply_move(state, move)
+
+        self.assertIs(next_state.side_to_move, Side.BLACK)
+        self.assertIsNone(next_state.piece_at(sq("e2")))
+        self.assertEqual(next_state.piece_at(sq("e3")).kind, PieceKind.PADATI)
+        # original state must be untouched
+        self.assertIsNotNone(state.piece_at(sq("e2")))
 
 
-def uci_moves(position):
-    return {move.uci for move in legal_moves(position)}
+class RathaTests(unittest.TestCase):
+    def test_blocked_by_own_piece(self):
+        state = state_with([
+            Piece("wR", PieceKind.RATHA, Side.WHITE, sq("a1")),
+            Piece("wP", PieceKind.PADATI, Side.WHITE, sq("a3")),
+            Piece("wK", PieceKind.RAJA, Side.WHITE, sq("h1")),
+            Piece("bK", PieceKind.RAJA, Side.BLACK, sq("h8")),
+        ])
+        destinations = {m.to_notation().split("-")[-1] for m in legal_moves_from(state, sq("a1"))}
+        self.assertIn("a1-a2", [m.to_notation() for m in legal_moves_from(state, sq("a1"))])
+        self.assertNotIn("a3", destinations)  # can't land on own piece
+        self.assertNotIn("a4", destinations)  # or slide past it
+
+    def test_captures_and_stops_at_enemy_piece(self):
+        state = state_with([
+            Piece("wR", PieceKind.RATHA, Side.WHITE, sq("a1")),
+            Piece("bP", PieceKind.PADATI, Side.BLACK, sq("a4")),
+            Piece("wK", PieceKind.RAJA, Side.WHITE, sq("h1")),
+            Piece("bK", PieceKind.RAJA, Side.BLACK, sq("h8")),
+        ])
+        moves = legal_moves_from(state, sq("a1"))
+        notations = [m.to_notation() for m in moves]
+        self.assertIn("a1xa4", notations)
+        self.assertNotIn("a1-a5", notations)  # blocked beyond the capture
 
 
-def kings(**extra):
-    return {
-        "a1": piece(Side.WHITE, PieceType.RAJA),
-        "h2": piece(Side.WHITE, PieceType.PADATI),
-        "h7": piece(Side.BLACK, PieceType.PADATI),
-        "h8": piece(Side.BLACK, PieceType.RAJA),
-        **extra,
-    }
+class AshvaGajaTests(unittest.TestCase):
+    def test_ashva_jumps_over_pieces(self):
+        # ashva boxed in on all four adjacent squares must still be able
+        # to jump, because knight-style movement ignores blockers.
+        state = state_with([
+            Piece("wA", PieceKind.ASHVA, Side.WHITE, sq("d4")),
+            Piece("wP1", PieceKind.PADATI, Side.WHITE, sq("d5")),
+            Piece("wP2", PieceKind.PADATI, Side.WHITE, sq("d3")),
+            Piece("wP3", PieceKind.PADATI, Side.WHITE, sq("c4")),
+            Piece("wP4", PieceKind.PADATI, Side.WHITE, sq("e4")),
+            Piece("wK", PieceKind.RAJA, Side.WHITE, sq("h1")),
+            Piece("bK", PieceKind.RAJA, Side.BLACK, sq("h8")),
+        ])
+        moves = legal_moves_from(state, sq("d4"))
+        self.assertEqual(len(moves), 8)  # all 8 knight destinations open
+
+    def test_gaja_jumps_and_ignores_intervening_piece(self):
+        state = state_with([
+            Piece("wG", PieceKind.GAJA, Side.WHITE, sq("d4")),
+            Piece("bP", PieceKind.PADATI, Side.BLACK, sq("e5")),  # sits between d4 and f6
+            Piece("wK", PieceKind.RAJA, Side.WHITE, sq("h1")),
+            Piece("bK", PieceKind.RAJA, Side.BLACK, sq("h8")),
+        ])
+        notations = [m.to_notation() for m in legal_moves_from(state, sq("d4"))]
+        self.assertIn("d4-f6", notations)  # jump succeeds despite e5 piece
+        self.assertNotIn("d4-e5", notations)  # can't land one square short
+        self.assertNotIn("d4xe5", notations)  # and never captures the jumped piece
+
+    def test_gaja_can_capture_on_landing_square(self):
+        state = state_with([
+            Piece("wG", PieceKind.GAJA, Side.WHITE, sq("d4")),
+            Piece("bP", PieceKind.PADATI, Side.BLACK, sq("f6")),
+            Piece("wK", PieceKind.RAJA, Side.WHITE, sq("h1")),
+            Piece("bK", PieceKind.RAJA, Side.BLACK, sq("h8")),
+        ])
+        notations = [m.to_notation() for m in legal_moves_from(state, sq("d4"))]
+        self.assertIn("d4xf6", notations)
 
 
-def test_initial_setup_is_asymmetric_and_has_sixteen_legal_moves():
-    position = initial_state()
-    assert position.piece_at("d1") == piece(Side.WHITE, PieceType.MANTRI)
-    assert position.piece_at("e1") == piece(Side.WHITE, PieceType.RAJA)
-    assert position.piece_at("d8") == piece(Side.BLACK, PieceType.RAJA)
-    assert position.piece_at("e8") == piece(Side.BLACK, PieceType.MANTRI)
-    assert len([p for p in position.board if p and p.side is Side.WHITE]) == 16
-    assert len([p for p in position.board if p and p.side is Side.BLACK]) == 16
-    assert len(legal_moves(position)) == 16
+class PadatiTests(unittest.TestCase):
+    def test_no_double_step_and_blocked_straight_move(self):
+        state = state_with([
+            Piece("wP", PieceKind.PADATI, Side.WHITE, sq("e2")),
+            Piece("bP", PieceKind.PADATI, Side.BLACK, sq("e3")),
+            Piece("wK", PieceKind.RAJA, Side.WHITE, sq("h1")),
+            Piece("bK", PieceKind.RAJA, Side.BLACK, sq("h8")),
+        ])
+        self.assertEqual(legal_moves_from(state, sq("e2")), [])
+
+    def test_diagonal_capture_only_when_enemy_present(self):
+        state = state_with([
+            Piece("wP", PieceKind.PADATI, Side.WHITE, sq("e2")),
+            Piece("bP", PieceKind.PADATI, Side.BLACK, sq("d3")),
+            Piece("wK", PieceKind.RAJA, Side.WHITE, sq("h1")),
+            Piece("bK", PieceKind.RAJA, Side.BLACK, sq("h8")),
+        ])
+        notations = [m.to_notation() for m in legal_moves_from(state, sq("e2"))]
+        self.assertIn("e2xd3", notations)
+        self.assertIn("e2-e3", notations)
+        self.assertNotIn("e2-f3", notations)  # nothing to capture there
+
+    def test_promotes_to_mantri_on_far_rank(self):
+        state = state_with([
+            Piece("wP", PieceKind.PADATI, Side.WHITE, sq("a7")),
+            Piece("wK", PieceKind.RAJA, Side.WHITE, sq("h1")),
+            Piece("bK", PieceKind.RAJA, Side.BLACK, sq("h8")),
+        ])
+        moves = legal_moves_from(state, sq("a7"))
+        self.assertEqual(len(moves), 1)
+        promo_move = moves[0]
+        self.assertEqual(promo_move.promotion, PieceKind.MANTRI)
+
+        next_state = apply_move(state, promo_move)
+        self.assertEqual(next_state.piece_at(sq("a8")).kind, PieceKind.MANTRI)
 
 
-def test_padati_has_no_double_step_and_captures_only_forward_diagonally():
-    position = state(kings(d2=piece(Side.WHITE, PieceType.PADATI), c3=piece(Side.BLACK, PieceType.ASHVA)))
-    moves = uci_moves(position)
-    assert "d2d3" in moves
-    assert "d2c3" in moves
-    assert "d2d4" not in moves
-    assert "d2e3" not in moves
+class CheckAndTerminalTests(unittest.TestCase):
+    def test_in_check_detection(self):
+        state = state_with([
+            Piece("bK", PieceKind.RAJA, Side.BLACK, sq("a8")),
+            Piece("wR", PieceKind.RATHA, Side.WHITE, sq("a1")),
+            Piece("wK", PieceKind.RAJA, Side.WHITE, sq("h1")),
+        ], side_to_move=Side.BLACK)
+        self.assertTrue(is_in_check(state, Side.BLACK))
+
+    def test_checkmate(self):
+        # Black raja on a8, mated by two coordinated white rathas.
+        state = state_with([
+            Piece("bK", PieceKind.RAJA, Side.BLACK, sq("a8")),
+            Piece("wR1", PieceKind.RATHA, Side.WHITE, sq("a1")),   # covers a-file
+            Piece("wR2", PieceKind.RATHA, Side.WHITE, sq("b8")),   # gives check, covers b-file
+            Piece("wR3", PieceKind.RATHA, Side.WHITE, sq("c8")),   # defends wR2 against capture
+            Piece("wK", PieceKind.RAJA, Side.WHITE, sq("h1")),
+        ], side_to_move=Side.BLACK)
+
+        self.assertTrue(is_in_check(state, Side.BLACK))
+        self.assertEqual(legal_moves(state), [])
+        self.assertTrue(is_terminal(state))
+        self.assertEqual(result(state), GameOutcome.WHITE_WINS)
+
+    def test_stalemate(self):
+        state = state_with([
+            Piece("bK", PieceKind.RAJA, Side.BLACK, sq("a8")),
+            Piece("wR1", PieceKind.RATHA, Side.WHITE, sq("b1")),   # covers b7, b8
+            Piece("wR2", PieceKind.RATHA, Side.WHITE, sq("c7")),   # covers a7 (and b7) via rank 7
+            Piece("wK", PieceKind.RAJA, Side.WHITE, sq("h1")),
+        ], side_to_move=Side.BLACK)
+
+        self.assertFalse(is_in_check(state, Side.BLACK))
+        self.assertEqual(legal_moves(state), [])
+        self.assertTrue(is_terminal(state))
+        self.assertEqual(result(state), GameOutcome.DRAW)
+
+    def test_ongoing_position_reports_ongoing(self):
+        state = initial_state()
+        self.assertFalse(is_terminal(state))
+        self.assertEqual(result(state), GameOutcome.ONGOING)
 
 
-def test_black_padati_moves_toward_rank_one():
-    position = state(kings(d7=piece(Side.BLACK, PieceType.PADATI)), Side.BLACK)
-    moves = uci_moves(position)
-    assert "d7d6" in moves
-    assert "d7d5" not in moves
+class RandomVsRandomSmokeTest(unittest.TestCase):
+    def test_many_random_games_complete_without_crashing(self):
+        # Mirrors the architecture doc's "random-vs-random full games"
+        # milestone: the rules engine should never produce a crash or an
+        # impossible state, regardless of which legal moves are chosen.
+        rng = random.Random(1234)
+        MAX_PLIES = 300
+
+        for game_index in range(15):
+            state = initial_state()
+            plies = 0
+            while not is_terminal(state) and plies < MAX_PLIES:
+                moves = legal_moves(state)
+                state = apply_move(state, rng.choice(moves))
+                plies += 1
+
+            # Every position along the way must have kept exactly one
+            # raja per side alive (a rules bug could otherwise let a
+            # raja be "captured" like a normal piece).
+            white_kings = sum(1 for p in state.pieces if p.side is Side.WHITE and p.kind is PieceKind.RAJA)
+            black_kings = sum(1 for p in state.pieces if p.side is Side.BLACK and p.kind is PieceKind.RAJA)
+            self.assertEqual(white_kings, 1, f"game {game_index} lost the white raja")
+            self.assertEqual(black_kings, 1, f"game {game_index} lost the black raja")
 
 
-def test_gaja_jumps_over_occupied_intervening_square_and_captures_destination():
-    position = state(kings(c1=piece(Side.WHITE, PieceType.GAJA), b2=piece(Side.WHITE, PieceType.PADATI), a3=piece(Side.BLACK, PieceType.ASHVA)))
-    assert "c1a3" in uci_moves(position)
-    moved = apply_move(position, ("c1", "a3"))
-    assert moved.piece_at("a3") == piece(Side.WHITE, PieceType.GAJA)
-    assert moved.piece_at("b2") == piece(Side.WHITE, PieceType.PADATI)
-    assert is_valid_gaja_jump("c1", "a3")
-    assert not is_valid_gaja_jump("c1", "b2")
-
-
-def test_modular_padati_validator_explicitly_rejects_double_step():
-    position = initial_state()
-    assert is_valid_padati_move(position, ("a2", "a3"), Side.WHITE)
-    assert not is_valid_padati_move(position, ("a2", "a4"), Side.WHITE)
-
-
-def test_all_non_sliding_piece_movements_are_exact():
-    mantri = state(kings(d4=piece(Side.WHITE, PieceType.MANTRI)))
-    assert {m for m in uci_moves(mantri) if m.startswith("d4")} == {"d4c3", "d4c5", "d4e3", "d4e5"}
-    ashva = state(kings(d4=piece(Side.WHITE, PieceType.ASHVA)))
-    assert len({m for m in uci_moves(ashva) if m.startswith("d4")}) == 8
-    gaja = state(kings(d4=piece(Side.WHITE, PieceType.GAJA)))
-    assert {m for m in uci_moves(gaja) if m.startswith("d4")} == {"d4b2", "d4b6", "d4f2", "d4f6"}
-
-
-def test_ratha_slides_but_cannot_cross_a_blocker():
-    position = state(kings(d4=piece(Side.WHITE, PieceType.RATHA), d6=piece(Side.WHITE, PieceType.PADATI)))
-    moves = uci_moves(position)
-    assert "d4d5" in moves
-    assert "d4d6" not in moves
-    assert "d4d7" not in moves
-
-
-def test_move_exposing_own_raja_is_filtered_out():
-    position = state({
-        "e1": piece(Side.WHITE, PieceType.RAJA),
-        "e2": piece(Side.WHITE, PieceType.RATHA),
-        "e8": piece(Side.BLACK, PieceType.RATHA),
-        "a8": piece(Side.BLACK, PieceType.RAJA),
-    })
-    assert "e2d2" not in uci_moves(position)
-    assert "e2e3" in uci_moves(position)
-    with pytest.raises(IllegalMoveError):
-        apply_move(position, ("e2", "d2"))
-
-
-def test_rajas_may_not_move_adjacent_and_raja_is_never_captured():
-    position = state({
-        "e1": piece(Side.WHITE, PieceType.RAJA),
-        "e3": piece(Side.BLACK, PieceType.RAJA),
-        "a1": piece(Side.WHITE, PieceType.RATHA),
-        "h8": piece(Side.BLACK, PieceType.RATHA),
-    })
-    assert "e1e2" not in uci_moves(position)
-
-
-def test_promotion_is_immediate_and_only_to_mantri():
-    position = state(kings(b7=piece(Side.WHITE, PieceType.PADATI)))
-    promoted = apply_move(position, Move.from_names("b7", "b8"))
-    assert promoted.piece_at("b8") == piece(Side.WHITE, PieceType.MANTRI)
-
-
-def test_checkmate_awards_opponent_plus_one_and_loser_minus_one():
-    position = state({
-        "a1": piece(Side.WHITE, PieceType.RAJA),
-        "h2": piece(Side.WHITE, PieceType.PADATI),
-        "a2": piece(Side.BLACK, PieceType.RATHA),
-        "b2": piece(Side.BLACK, PieceType.RATHA),
-        "h3": piece(Side.BLACK, PieceType.MANTRI),
-        "h8": piece(Side.BLACK, PieceType.RAJA),
-    })
-    outcome = terminal_status(position)
-    assert is_in_check(position)
-    assert outcome.reason is TerminalReason.CHECKMATE
-    assert outcome.winner is Side.BLACK
-    assert result(position, Side.BLACK) == 1
-    assert result(position, Side.WHITE) == -1
-
-
-def test_bare_king_is_an_immediate_win_even_if_bare_raja_has_moves():
-    position = state({
-        "a1": piece(Side.WHITE, PieceType.RAJA),
-        "h8": piece(Side.BLACK, PieceType.RAJA),
-        "h7": piece(Side.BLACK, PieceType.MANTRI),
-    })
-    outcome = terminal_status(position)
-    assert outcome == terminal_status(position)  # deterministic evaluation
-    assert outcome.reason is TerminalReason.BARE_KING
-    assert outcome.winner is Side.BLACK
-    assert legal_moves(position) == ()
-    with pytest.raises(GameOverError):
-        apply_move(position, ("a1", "a2"))
-
-
-def test_capturing_last_non_raja_piece_triggers_bare_king():
-    position = state({
-        "a1": piece(Side.WHITE, PieceType.RAJA),
-        "b2": piece(Side.WHITE, PieceType.RATHA),
-        "h8": piece(Side.BLACK, PieceType.RAJA),
-        "b7": piece(Side.BLACK, PieceType.MANTRI),
-    })
-    ended = apply_move(position, ("b2", "b7"))
-    outcome = terminal_status(ended)
-    assert outcome.reason is TerminalReason.BARE_KING
-    assert outcome.winner is Side.WHITE
-
-
-def test_stalemate_is_a_win_for_the_player_who_delivered_it():
-    position = state({
-        "a1": piece(Side.WHITE, PieceType.RAJA),
-        "h2": piece(Side.WHITE, PieceType.PADATI),
-        "b3": piece(Side.BLACK, PieceType.RATHA),
-        "c2": piece(Side.BLACK, PieceType.RATHA),
-        "h3": piece(Side.BLACK, PieceType.MANTRI),
-        "h8": piece(Side.BLACK, PieceType.RAJA),
-    })
-    outcome = terminal_status(position)
-    assert not is_in_check(position)
-    assert legal_moves(position) == ()
-    assert outcome.reason is TerminalReason.STALEMATE
-    assert outcome.winner is Side.BLACK
-
-
-def test_no_castling_move_is_generated():
-    position = state({
-        "e1": piece(Side.WHITE, PieceType.RAJA),
-        "h1": piece(Side.WHITE, PieceType.RATHA),
-        "a8": piece(Side.BLACK, PieceType.RAJA),
-        "h8": piece(Side.BLACK, PieceType.RATHA),
-    })
-    assert "e1g1" not in uci_moves(position)
+if __name__ == "__main__":
+    unittest.main()

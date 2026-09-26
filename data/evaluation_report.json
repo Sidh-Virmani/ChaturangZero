@@ -1,0 +1,844 @@
+{
+  "createdAt": "2026-09-18T19:37:52.214054+00:00",
+  "checkpoint": "best.pt",
+  "sha256": "5ec8c69da8277af8966d5478d5dc8c0dfb4324fb12956a551e44c14c78f7d126",
+  "model": {
+    "name": "CZ-001.1",
+    "trained": true,
+    "createdAt": "2026-09-18T04:38:06.363495+00:00",
+    "examples": 1456,
+    "trainingGames": 12,
+    "epochs": 8,
+    "curriculum": true,
+    "seed": 42,
+    "arena": {
+      "wins": 0,
+      "draws": 7,
+      "losses": 1,
+      "truncated": 3,
+      "games": 8,
+      "opponent": "previous checkpoint",
+      "scope": "two-chariot endgames",
+      "simulations": 20,
+      "maxPlies": 80,
+      "seed": 5042,
+      "score": 0.4375
+    },
+    "baseline": {
+      "wins": 1,
+      "draws": 7,
+      "losses": 0,
+      "truncated": 6,
+      "games": 8,
+      "opponent": "random",
+      "scope": "two-chariot endgames",
+      "simulations": 20,
+      "maxPlies": 80,
+      "seed": 9042,
+      "score": 0.5625
+    },
+    "limitations": "Small CPU pilot. Strength and improvement are not established by this sample."
+  },
+  "seed": 713731,
+  "initialWeightsSeed": 42,
+  "searchVersion": 2,
+  "gamesPerComparison": 16,
+  "simulations": 64,
+  "maxPlies": 200,
+  "comparisons": [
+    {
+      "wins": 5,
+      "draws": 10,
+      "losses": 1,
+      "truncated": 1,
+      "games": 16,
+      "gameResults": [
+        {
+          "pair": 0,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 91,
+          "truncated": false
+        },
+        {
+          "pair": 0,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 26,
+          "truncated": false
+        },
+        {
+          "pair": 1,
+          "candidateSide": "white",
+          "score": 1.0,
+          "plies": 3,
+          "truncated": false
+        },
+        {
+          "pair": 1,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 2,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 185,
+          "truncated": false
+        },
+        {
+          "pair": 2,
+          "candidateSide": "black",
+          "score": 1.0,
+          "plies": 81,
+          "truncated": false
+        },
+        {
+          "pair": 3,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 100,
+          "truncated": false
+        },
+        {
+          "pair": 3,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 124,
+          "truncated": false
+        },
+        {
+          "pair": 4,
+          "candidateSide": "white",
+          "score": 0.0,
+          "plies": 45,
+          "truncated": false
+        },
+        {
+          "pair": 4,
+          "candidateSide": "black",
+          "score": 1.0,
+          "plies": 81,
+          "truncated": false
+        },
+        {
+          "pair": 5,
+          "candidateSide": "white",
+          "score": 1.0,
+          "plies": 1,
+          "truncated": false
+        },
+        {
+          "pair": 5,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 118,
+          "truncated": false
+        },
+        {
+          "pair": 6,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 128,
+          "truncated": false
+        },
+        {
+          "pair": 6,
+          "candidateSide": "black",
+          "score": 1.0,
+          "plies": 33,
+          "truncated": false
+        },
+        {
+          "pair": 7,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 86,
+          "truncated": false
+        },
+        {
+          "pair": 7,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 33,
+          "truncated": false
+        }
+      ],
+      "opponent": "random",
+      "scope": "two-chariot endgames",
+      "simulations": 64,
+      "maxPlies": 200,
+      "seed": 713731,
+      "score": 0.625,
+      "name": "trained vs random",
+      "paired95Interval": [
+        0.53125,
+        0.71875
+      ]
+    },
+    {
+      "wins": 2,
+      "draws": 14,
+      "losses": 0,
+      "truncated": 0,
+      "games": 16,
+      "gameResults": [
+        {
+          "pair": 0,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 97,
+          "truncated": false
+        },
+        {
+          "pair": 0,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 100,
+          "truncated": false
+        },
+        {
+          "pair": 1,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 116,
+          "truncated": false
+        },
+        {
+          "pair": 1,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 190,
+          "truncated": false
+        },
+        {
+          "pair": 2,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 142,
+          "truncated": false
+        },
+        {
+          "pair": 2,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 100,
+          "truncated": false
+        },
+        {
+          "pair": 3,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 100,
+          "truncated": false
+        },
+        {
+          "pair": 3,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 114,
+          "truncated": false
+        },
+        {
+          "pair": 4,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 138,
+          "truncated": false
+        },
+        {
+          "pair": 4,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 12,
+          "truncated": false
+        },
+        {
+          "pair": 5,
+          "candidateSide": "white",
+          "score": 1.0,
+          "plies": 1,
+          "truncated": false
+        },
+        {
+          "pair": 5,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 175,
+          "truncated": false
+        },
+        {
+          "pair": 6,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 196,
+          "truncated": false
+        },
+        {
+          "pair": 6,
+          "candidateSide": "black",
+          "score": 1.0,
+          "plies": 15,
+          "truncated": false
+        },
+        {
+          "pair": 7,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 140,
+          "truncated": false
+        },
+        {
+          "pair": 7,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 180,
+          "truncated": false
+        }
+      ],
+      "opponent": "random",
+      "scope": "two-chariot endgames",
+      "simulations": 64,
+      "maxPlies": 200,
+      "seed": 713731,
+      "score": 0.5625,
+      "name": "initial vs random",
+      "paired95Interval": [
+        0.5,
+        0.65625
+      ]
+    },
+    {
+      "wins": 2,
+      "draws": 10,
+      "losses": 4,
+      "truncated": 0,
+      "games": 16,
+      "gameResults": [
+        {
+          "pair": 0,
+          "candidateSide": "white",
+          "score": 0.0,
+          "plies": 11,
+          "truncated": false
+        },
+        {
+          "pair": 0,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 100,
+          "truncated": false
+        },
+        {
+          "pair": 1,
+          "candidateSide": "white",
+          "score": 1.0,
+          "plies": 3,
+          "truncated": false
+        },
+        {
+          "pair": 1,
+          "candidateSide": "black",
+          "score": 0.0,
+          "plies": 133,
+          "truncated": false
+        },
+        {
+          "pair": 2,
+          "candidateSide": "white",
+          "score": 0.0,
+          "plies": 21,
+          "truncated": false
+        },
+        {
+          "pair": 2,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 164,
+          "truncated": false
+        },
+        {
+          "pair": 3,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 182,
+          "truncated": false
+        },
+        {
+          "pair": 3,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 99,
+          "truncated": false
+        },
+        {
+          "pair": 4,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 100,
+          "truncated": false
+        },
+        {
+          "pair": 4,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 75,
+          "truncated": false
+        },
+        {
+          "pair": 5,
+          "candidateSide": "white",
+          "score": 1.0,
+          "plies": 1,
+          "truncated": false
+        },
+        {
+          "pair": 5,
+          "candidateSide": "black",
+          "score": 0.0,
+          "plies": 1,
+          "truncated": false
+        },
+        {
+          "pair": 6,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 12,
+          "truncated": false
+        },
+        {
+          "pair": 6,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 188,
+          "truncated": false
+        },
+        {
+          "pair": 7,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 192,
+          "truncated": false
+        },
+        {
+          "pair": 7,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 154,
+          "truncated": false
+        }
+      ],
+      "opponent": "previous checkpoint",
+      "scope": "two-chariot endgames",
+      "simulations": 64,
+      "maxPlies": 200,
+      "seed": 713731,
+      "score": 0.4375,
+      "name": "trained vs initial",
+      "paired95Interval": [
+        0.34375,
+        0.5
+      ]
+    },
+    {
+      "wins": 1,
+      "draws": 15,
+      "losses": 0,
+      "truncated": 14,
+      "games": 16,
+      "gameResults": [
+        {
+          "pair": 0,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 0,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 1,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 1,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 2,
+          "candidateSide": "white",
+          "score": 1.0,
+          "plies": 139,
+          "truncated": false
+        },
+        {
+          "pair": 2,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 3,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 3,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 107,
+          "truncated": false
+        },
+        {
+          "pair": 4,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 4,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 5,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 5,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 6,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 6,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 7,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 7,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        }
+      ],
+      "opponent": "random",
+      "scope": "full board after 8 seeded opening plies",
+      "simulations": 64,
+      "maxPlies": 200,
+      "seed": 723731,
+      "score": 0.53125,
+      "name": "trained vs random",
+      "paired95Interval": [
+        0.5,
+        0.59375
+      ]
+    },
+    {
+      "wins": 2,
+      "draws": 13,
+      "losses": 1,
+      "truncated": 13,
+      "games": 16,
+      "gameResults": [
+        {
+          "pair": 0,
+          "candidateSide": "white",
+          "score": 1.0,
+          "plies": 25,
+          "truncated": false
+        },
+        {
+          "pair": 0,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 1,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 1,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 2,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 2,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 3,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 3,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 4,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 4,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 5,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 5,
+          "candidateSide": "black",
+          "score": 0.0,
+          "plies": 165,
+          "truncated": false
+        },
+        {
+          "pair": 6,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 6,
+          "candidateSide": "black",
+          "score": 1.0,
+          "plies": 80,
+          "truncated": false
+        },
+        {
+          "pair": 7,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 7,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        }
+      ],
+      "opponent": "random",
+      "scope": "full board after 8 seeded opening plies",
+      "simulations": 64,
+      "maxPlies": 200,
+      "seed": 723731,
+      "score": 0.53125,
+      "name": "initial vs random",
+      "paired95Interval": [
+        0.4375,
+        0.625
+      ]
+    },
+    {
+      "wins": 1,
+      "draws": 15,
+      "losses": 0,
+      "truncated": 15,
+      "games": 16,
+      "gameResults": [
+        {
+          "pair": 0,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 0,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 1,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 1,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 2,
+          "candidateSide": "white",
+          "score": 1.0,
+          "plies": 97,
+          "truncated": false
+        },
+        {
+          "pair": 2,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 3,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 3,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 4,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 4,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 5,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 5,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 6,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 6,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 7,
+          "candidateSide": "white",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        },
+        {
+          "pair": 7,
+          "candidateSide": "black",
+          "score": 0.5,
+          "plies": 200,
+          "truncated": true
+        }
+      ],
+      "opponent": "previous checkpoint",
+      "scope": "full board after 8 seeded opening plies",
+      "simulations": 64,
+      "maxPlies": 200,
+      "seed": 723731,
+      "score": 0.53125,
+      "name": "trained vs initial",
+      "paired95Interval": [
+        0.5,
+        0.59375
+      ]
+    }
+  ],
+  "interpretation": "Scores count draws as 0.5. Ply-cap draws are reported separately. Confidence intervals resample color-swapped pairs. Endgame results do not establish full-board strength.",
+  "complete": true
+}

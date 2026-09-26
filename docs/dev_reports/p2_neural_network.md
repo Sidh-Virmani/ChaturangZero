@@ -1,5 +1,10 @@
 # P2 neural network: turning a position into move advice and a position estimate
 
+> Historical development report. It describes the original P2 prototype and
+> its API. The current delivered network uses **14** input planes, 32 feature
+> channels, two residual blocks, and policy/value heads; see the root README
+> and `docs/MODEL_CARD.md` for the current implementation.
+
 ## 1. What problem does P2 solve?
 
 P1 translates a Chaturanga position into numbers. Its `encode_state()` function gives us 13 board-shaped sheets containing zeros and ones. Those sheets accurately describe the pieces and whose turn it is, but they do not contain an opinion about the position.

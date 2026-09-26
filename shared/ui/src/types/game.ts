@@ -47,6 +47,8 @@ export interface GameStatus {
 }
 
 export interface BoardState {
+  revision: number
+  scenario: 'opening' | 'mate' | 'endgame'
   pieces: Piece[]
   currentTurn: Side
   selectableSquares: SquareId[]
@@ -54,4 +56,82 @@ export interface BoardState {
   moveHistory: Move[]
   status: GameStatus
   isAiThinking: boolean
+}
+
+export interface ModelInfo {
+  name: string
+  trained: boolean
+  parameters: number
+  channels: number
+  blocks: number
+  actions: number
+  epochs?: number
+  examples?: number
+  trainingGames?: number
+  curriculum?: boolean
+  limitations: string
+}
+
+export interface Candidate {
+  from: SquareId
+  to: SquareId
+  notation: string
+  visits: number
+  prior: number
+  probability: number
+  value: number
+}
+
+export interface SearchNode {
+  move: string
+  visits: number
+  value: number
+  prior: number
+  children?: SearchNode[]
+}
+
+export interface Analysis {
+  value: number
+  searchValue: number
+  simulations: number
+  elapsedMs: number
+  depth: number
+  candidates: Candidate[]
+  tree: SearchNode
+  layers: { name: string; shape: number[]; heatmap: number[]; maxActivation: number; channels: number[][] }[]
+  input: number[][][]
+  inputShape: number[]
+  policyHeatmap: number[]
+  policyPriorHeatmap: number[]
+  principalVariation: string[]
+  model: ModelInfo
+  positionPly: number
+  positionTurn: Side
+}
+
+export interface Evaluation {
+  wins: number; draws: number; losses: number; games: number; score: number
+  truncated: number; scope: string; opponent: string; simulations: number; maxPlies: number
+}
+
+export interface TrainingState {
+  job: { running: boolean; phase: string; detail: string; progress: number }
+  evaluation?: null | {
+    complete?: boolean
+    model: ModelInfo
+    sha256: string
+    seed: number
+    simulations: number
+    maxPlies: number
+    gamesPerComparison: number
+    comparisons: (Evaluation & { name: string; paired95Interval: [number, number] })[]
+  }
+  metrics: null | {
+    replayExamples?: number
+    epochs: { step: number; loss: number; policyLoss: number; valueLoss: number }[]
+    games: { plies: number; winner: string | null; truncated: boolean; source: string }[]
+    runs: { id: number; round: number; promoted: boolean; bootstrap: boolean; arena: Evaluation; baseline: Evaluation; seconds: number }[]
+    model: ModelInfo
+    updatedAt: string
+  }
 }

@@ -1,53 +1,42 @@
-"""Authoritative, deterministic rules engine for classical Chaturanga."""
+"""Chaturanga game core — the single source of truth for the rules.
 
-from .core import (
-    BOARD_SIZE,
-    Game,
-    GameOverError,
-    GameState,
-    IllegalMoveError,
-    Move,
-    Outcome,
-    Piece,
-    PieceType,
-    Side,
-    TerminalReason,
+Every other module in this project (representation, neural network, MCTS,
+training, and any future UI backend) should call into this package rather
+than re-implementing rule logic. Import the public API from here:
+
+    from shared.game_core import (
+        initial_state, legal_moves, legal_moves_from, apply_move,
+        is_terminal, result, clone_state, is_in_check,
+    )
+"""
+
+from .board import initial_state, render_ascii
+from .rules import (
     apply_move,
     clone_state,
-    initial_state,
     is_in_check,
     is_terminal,
-    is_valid_gaja_jump,
-    is_valid_padati_move,
     legal_moves,
-    parse_square,
+    legal_moves_from,
     result,
-    square_name,
-    terminal_status,
 )
+from .types import GameOutcome, GameState, Move, Piece, PieceKind, Side, Square
 
 __all__ = [
-    "BOARD_SIZE",
-    "Game",
-    "GameOverError",
-    "GameState",
-    "IllegalMoveError",
-    "Move",
-    "Outcome",
-    "Piece",
-    "PieceType",
-    "Side",
-    "TerminalReason",
+    "initial_state",
+    "render_ascii",
     "apply_move",
     "clone_state",
-    "initial_state",
     "is_in_check",
     "is_terminal",
-    "is_valid_gaja_jump",
-    "is_valid_padati_move",
     "legal_moves",
-    "parse_square",
+    "legal_moves_from",
     "result",
-    "square_name",
-    "terminal_status",
+    "GameOutcome",
+    "GameState",
+    "Move",
+    "Piece",
+    "PieceKind",
+    "Side",
+    "Square",
 ]
