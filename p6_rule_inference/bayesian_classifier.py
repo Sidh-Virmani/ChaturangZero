@@ -99,7 +99,7 @@ class BayesianRuleClassifier:
     def print_inference_report(self, move_notations: list[str]) -> None:
         probs = self.infer_rules(move_notations)
         print(f"\n[bayesian] Rule Inference for {len(move_notations)}-move sequence")
-        print("────────────────────────────────────────────────────────")
+        print("--------------------------------------------------------")
         for v, p in sorted(probs.items(), key=lambda x: x[1], reverse=True):
             print(f"  {v:20s} : {p * 100:>5.1f}%")
-        print("────────────────────────────────────────────────────────")
+        print("--------------------------------------------------------")

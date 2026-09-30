@@ -1,7 +1,7 @@
 """
 p6_rule_inference/__init__.py
 ==============================
-Computational Game Archaeology — the truly unique layer of ChaturangZero-X.
+Computational Game Archaeology - the truly unique layer of ChaturangZero-X.
 
 This package contains four original research contributions that no published
 system has applied to any historically uncertain board game:
@@ -18,7 +18,7 @@ system has applied to any historically uncertain board game:
   C. Strategy DNA Fingerprinting
      Extract a mathematical game signature from any move sequence.
      Compute strategic distance between rule variants.
-     Build a phylogenetic tree of the chess family (Chaturanga→Chess→Shogi→Xiangqi).
+     Build a phylogenetic tree of the chess family (Chaturanga->Chess->Shogi->Xiangqi).
      Files: strategy_dna.py, phylogenetic_tree.py
 
   D. Neural Game Quality Optimizer

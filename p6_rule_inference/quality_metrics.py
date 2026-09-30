@@ -97,10 +97,10 @@ class QualityReport:
 
     def summary(self) -> str:
         return (
-            f"\n{'═'*50}\n"
+            f"\n{'='*50}\n"
             f"  Rule variant : {self.rule_variant}\n"
             f"  Games played : {self.n_games}\n"
-            f"  ─────────────────────────────────────\n"
+            f"  -------------------------------------\n"
             f"  Decisiveness      : {self.decisiveness:.3f}\n"
             f"  Mean game length  : {self.mean_length:.1f} plies\n"
             f"  Length score      : {self.length_score:.3f}\n"
@@ -108,9 +108,9 @@ class QualityReport:
             f"  Material volatility: {self.material_volatility:.3f}\n"
             f"  Blunder frequency : {self.blunder_frequency:.3f}\n"
             f"  Opening diversity : {self.opening_diversity:.3f}\n"
-            f"  ─────────────────────────────────────\n"
-            f"  ★ QUALITY SCORE   : {self.quality_score:.4f}\n"
-            f"{'═'*50}\n"
+            f"  -------------------------------------\n"
+            f"  * QUALITY SCORE   : {self.quality_score:.4f}\n"
+            f"{'='*50}\n"
         )
 
     def to_dict(self) -> dict:
@@ -241,7 +241,7 @@ def compute_quality_report(
             print(f"  [{rule_config.variant.value}] game {i+1}/{n_games}: "
                   f"plies={rec.plies} winner={rec.winner}")
 
-    # ── Compute metrics ────────────────────────────────────────────────────────
+    # -- Compute metrics --------------------------------------------------------
     decisive_count = sum(1 for r in records if r.decisive)
     decisiveness   = decisive_count / max(n_games, 1)
 
@@ -277,7 +277,7 @@ def compute_quality_report(
     unique_openings  = len(set(r.opening_key for r in records))
     opening_diversity = unique_openings / max(n_games, 1)
 
-    # ── Composite quality score ────────────────────────────────────────────────
+    # -- Composite quality score ------------------------------------------------
     quality_score = (
           weights.get("decisiveness",        0.30) * decisiveness
         + weights.get("length_score",        0.20) * length_score
