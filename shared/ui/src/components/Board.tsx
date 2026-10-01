@@ -16,6 +16,7 @@ interface BoardProps {
   legalMoves: LegalMove[]
   disabled: boolean
   busy: boolean
+  busyLabel: string
   onSquareClick: (square: SquareId) => void
 }
 
@@ -26,6 +27,7 @@ export function Board({
   legalMoves,
   disabled,
   busy,
+  busyLabel,
   onSquareClick,
 }: BoardProps) {
   const piecesBySquare = new Map(state.pieces.map((piece) => [piece.square, piece]))
@@ -75,7 +77,7 @@ export function Board({
       {busy && (
         <div className="board-loading" role="status">
           <span className="spinner" />
-          Syncing with engine...
+          {busyLabel}
         </div>
       )}
     </div>

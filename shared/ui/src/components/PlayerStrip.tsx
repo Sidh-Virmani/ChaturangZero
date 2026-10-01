@@ -1,5 +1,4 @@
-import type { GameMode } from '../App'
-import type { Side } from '../types/game'
+import type { GameMode, Side } from '../types/game'
 
 interface PlayerStripProps { side: Side; currentTurn: Side; mode: GameMode }
 

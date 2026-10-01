@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from numbers import Integral
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
 
@@ -35,6 +35,7 @@ class MCTS:
         self,
         state: GameState,
         config: Optional[MCTSConfig] = None,
+        on_simulation: Optional[Callable[[int], None]] = None,
     ) -> tuple[np.ndarray, Move, int]:
         """Search ``state`` and return policy, selected move, and action ID.
 
@@ -62,7 +63,7 @@ class MCTS:
         if search_config.add_noise:
             self._add_dirichlet_noise(root, search_config)
 
-        for _ in range(search_config.num_simulations):
+        for simulation in range(1, search_config.num_simulations + 1):
             leaf = root
             while leaf.is_expanded and not leaf.is_terminal:
                 _, leaf = leaf.select_best_child(search_config.c_puct)
@@ -74,6 +75,8 @@ class MCTS:
             else:
                 value = self._evaluate_and_expand(leaf)
             self._backpropagate(leaf, value)
+            if on_simulation is not None:
+                on_simulation(simulation)
 
         policy = self._policy_from_visits(root, search_config.temperature)
         chosen_action = self._select_action(policy, search_config.temperature)

@@ -5,6 +5,7 @@ export type File = (typeof FILES)[number]
 export type Rank = (typeof RANKS)[number]
 export type SquareId = `${File}${Rank}`
 export type Side = 'white' | 'black'
+export type GameMode = 'human' | 'machine'
 export type PieceKind = 'raja' | 'mantri' | 'ratha' | 'gaja' | 'ashva' | 'padati'
 
 export interface Square {
@@ -46,6 +47,39 @@ export interface GameStatus {
   result?: string
 }
 
+export interface AnalyzedAction {
+  from: SquareId
+  to: SquareId
+  actionId: number
+  prior: number
+  visits?: number
+}
+
+export interface MachineAnalysis {
+  checkpoint: string
+  smokeCheckpoint: boolean
+  sideToMove: Side
+  actionSpaceSize: number
+  legalActionCount: number
+  value: number
+  simulations: number
+  cPuct: number
+  rootVisits: number
+  policyPriors: AnalyzedAction[]
+  candidates: AnalyzedAction[]
+  selectedAction: AnalyzedAction
+}
+
+export interface MachineProgress {
+  phase: string
+  events: string[]
+  legalActionCount: number | null
+  simulationsCompleted: number
+  totalSimulations: number
+  done: boolean
+  error: string | null
+}
+
 export interface BoardState {
   pieces: Piece[]
   currentTurn: Side
@@ -54,4 +88,9 @@ export interface BoardState {
   moveHistory: Move[]
   status: GameStatus
   isAiThinking: boolean
+  mode: GameMode
+  machineReady: boolean
+  checkpointLabel: string | null
+  smokeCheckpoint: boolean
+  analysis: MachineAnalysis | null
 }

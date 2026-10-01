@@ -1,4 +1,4 @@
-import type { GameMode } from '../App'
+import type { GameMode } from '../types/game'
 
 interface HomeScreenProps { onStart: (mode: GameMode) => void }
 
@@ -19,8 +19,8 @@ export function HomeScreen({ onStart }: HomeScreenProps) {
           </button>
           <button className="mode-card mode-card--machine" type="button" onClick={() => onStart('machine')}>
             <span className="mode-card__number">02 / MACHINE MATCH</span>
-            <span className="mode-card__main"><span className="mode-card__symbol mode-card__symbol--machine" aria-hidden="true"><i /><i /><i /><i /></span><span><strong>Human vs Machine</strong><small>AI play will arrive when a trained model is connected.</small></span></span>
-            <span className="mode-card__footer"><span>PREVIEW MODE</span><span className="mode-card__arrow" aria-hidden="true">↗</span></span>
+            <span className="mode-card__main"><span className="mode-card__symbol mode-card__symbol--machine" aria-hidden="true"><i /><i /><i /><i /></span><span><strong>Human vs Machine</strong><small>Play against the checkpoint-backed search opponent.</small></span></span>
+            <span className="mode-card__footer"><span>PLAY MACHINE</span><span className="mode-card__arrow" aria-hidden="true">↗</span></span>
           </button>
         </div>
         <div className="home-board" aria-hidden="true"><div className="home-board__inner"><span>अष्टापद</span><small>THE EIGHT BY EIGHT BOARD</small></div></div>

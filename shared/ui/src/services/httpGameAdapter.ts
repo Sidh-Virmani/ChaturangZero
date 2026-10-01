@@ -1,5 +1,5 @@
 import type { GameAdapter } from './gameAdapter'
-import type { BoardState, LegalMove, SquareId } from '../types/game'
+import type { BoardState, GameMode, LegalMove, MachineProgress, SquareId } from '../types/game'
 
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
@@ -38,11 +38,22 @@ export class HttpGameAdapter implements GameAdapter {
     })
   }
 
-  resetGame(): Promise<BoardState> {
+  resetGame(mode: GameMode): Promise<BoardState> {
     return apiRequest<BoardState>('/api/game/reset', {
+      method: 'POST',
+      body: JSON.stringify({ mode }),
+    })
+  }
+
+  requestMachineMove(): Promise<BoardState> {
+    return apiRequest<BoardState>('/api/game/ai/move', {
       method: 'POST',
       body: '{}',
     })
+  }
+
+  getMachineProgress(): Promise<MachineProgress> {
+    return apiRequest<MachineProgress>('/api/game/ai/status')
   }
 }
 
