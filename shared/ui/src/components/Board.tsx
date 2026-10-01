@@ -4,23 +4,28 @@ import {
   RANKS,
   type BoardState,
   type LegalMove,
+  type Side,
   type Square as SquareData,
   type SquareId,
 } from '../types/game'
 
 interface BoardProps {
   state: BoardState
+  orientation: Side
   selectedSquare: SquareId | null
   legalMoves: LegalMove[]
   disabled: boolean
+  busy: boolean
   onSquareClick: (square: SquareId) => void
 }
 
 export function Board({
   state,
+  orientation,
   selectedSquare,
   legalMoves,
   disabled,
+  busy,
   onSquareClick,
 }: BoardProps) {
   const piecesBySquare = new Map(state.pieces.map((piece) => [piece.square, piece]))
@@ -28,12 +33,14 @@ export function Board({
   const lastMoveSquares = new Set(
     state.lastMove ? [state.lastMove.from, state.lastMove.to] : [],
   )
+  const files = orientation === 'white' ? FILES : [...FILES].reverse()
+  const ranks = orientation === 'white' ? RANKS : [...RANKS].reverse()
 
   return (
     <div className="board-frame">
-      <div className="board" role="grid" aria-label="Chaturanga board" aria-busy={disabled}>
-        {RANKS.flatMap((rank, rankIndex) =>
-          FILES.map((file, fileIndex) => {
+      <div className="board" role="grid" aria-label={`Chaturanga board, ${orientation} perspective`} aria-busy={busy}>
+        {ranks.flatMap((rank, rankIndex) =>
+          files.map((file, fileIndex) => {
             const square: SquareData = {
               id: `${file}${rank}`,
               file,
@@ -55,6 +62,9 @@ export function Board({
                 isLegalDestination={Boolean(legalMove)}
                 isCaptureDestination={legalMove?.isCapture ?? false}
                 isLastMove={lastMoveSquares.has(square.id)}
+                isLastMoveDestination={state.lastMove?.to === square.id}
+                showRank={fileIndex === 0}
+                showFile={rankIndex === 7}
                 disabled={disabled || (!isInteractive && selectedSquare === null)}
                 onClick={() => onSquareClick(square.id)}
               />
@@ -62,7 +72,7 @@ export function Board({
           }),
         )}
       </div>
-      {disabled && (
+      {busy && (
         <div className="board-loading" role="status">
           <span className="spinner" />
           Syncing with engine...

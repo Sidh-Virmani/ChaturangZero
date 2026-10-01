@@ -1,15 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Board } from './components/Board'
 import { GameSidebar } from './components/GameSidebar'
+import { HomeScreen } from './components/HomeScreen'
+import { PlayerStrip } from './components/PlayerStrip'
+import { ResultModal } from './components/ResultModal'
 import { gameAdapter } from './services/httpGameAdapter'
-import type { BoardState, LegalMove, SquareId } from './types/game'
+import type { BoardState, LegalMove, Side, SquareId } from './types/game'
+
+export type GameMode = 'human' | 'machine'
 
 function App() {
-  const hasLoaded = useRef(false)
+  const [screen, setScreen] = useState<'home' | 'game'>('home')
+  const [mode, setMode] = useState<GameMode>('human')
+  const [orientation, setOrientation] = useState<Side>('white')
   const [state, setState] = useState<BoardState | null>(null)
   const [selectedSquare, setSelectedSquare] = useState<SquareId | null>(null)
   const [legalMoves, setLegalMoves] = useState<LegalMove[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const clearSelection = useCallback(() => {
@@ -17,24 +24,41 @@ function App() {
     setLegalMoves([])
   }, [])
 
-  const loadGame = useCallback(async () => {
+  const startGame = async (nextMode: GameMode) => {
+    setScreen('game')
+    setMode(nextMode)
+    setOrientation('white')
+    setIsLoading(true)
+    setError(null)
+    setState(null)
+    clearSelection()
+    try {
+      setState(await gameAdapter.resetGame())
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to start the game.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const goHome = () => {
+    clearSelection()
+    setError(null)
+    setScreen('home')
+  }
+
+  const resetGame = async () => {
     setIsLoading(true)
     setError(null)
     clearSelection()
     try {
-      setState(await gameAdapter.getState())
+      setState(await gameAdapter.resetGame())
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to load the game.')
+      setError(cause instanceof Error ? cause.message : 'Unable to reset the game.')
     } finally {
       setIsLoading(false)
     }
-  }, [clearSelection])
-
-  useEffect(() => {
-    if (hasLoaded.current) return
-    hasLoaded.current = true
-    void loadGame()
-  }, [loadGame])
+  }
 
   const selectSquare = async (square: SquareId) => {
     setIsLoading(true)
@@ -56,13 +80,11 @@ function App() {
   }
 
   const handleSquareClick = async (square: SquareId) => {
-    if (!state || isLoading || state.status.code === 'terminal' || state.isAiThinking) return
-
+    if (!state || isLoading || mode === 'machine' || state.status.code === 'terminal' || state.isAiThinking) return
     if (square === selectedSquare) {
       clearSelection()
       return
     }
-
     const suppliedMove = legalMoves.find((move) => move.to === square)
     if (selectedSquare && suppliedMove) {
       setIsLoading(true)
@@ -77,90 +99,53 @@ function App() {
       }
       return
     }
-
     if (state.selectableSquares.includes(square)) {
       await selectSquare(square)
-      return
-    }
-
-    clearSelection()
-  }
-
-  const handleReset = async () => {
-    setIsLoading(true)
-    setError(null)
-    clearSelection()
-    try {
-      setState(await gameAdapter.resetGame())
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to reset the game.')
-    } finally {
-      setIsLoading(false)
+    } else {
+      clearSelection()
     }
   }
+
+  const flipBoard = () => {
+    clearSelection()
+    setOrientation((side) => side === 'white' ? 'black' : 'white')
+  }
+
+  const topSide: Side = orientation === 'white' ? 'black' : 'white'
 
   return (
     <div className="app-shell">
       <header className="site-header">
         <div className="header-inner">
-          <a className="brand" href="/" aria-label="ChaturangZero home">
-            <span className="brand__mark" aria-hidden="true">
-              <i /><i /><i /><i />
-            </span>
-            <span>
-              <strong>ChaturangZero</strong>
-              <small>Play board</small>
-            </span>
-          </a>
-          <div className="adapter-badge">
-            <span /> Game core connected
-          </div>
+          <button className="brand" type="button" onClick={goHome} aria-label="ChaturangZero home">
+            <span className="brand__mark" aria-hidden="true"><i /><i /><i /><i /></span>
+            <span><strong>ChaturangZero</strong><small>THE ROYAL GAME</small></span>
+          </button>
+          <div className="header-right"><span className="header-edition">A CLASSIC GAME OF STRATEGY</span><span className="header-indicator" aria-hidden="true" /></div>
         </div>
       </header>
-
       <main className="main-content">
-        {error && (
-          <div className="error-banner" role="alert">
-            <div>
-              <strong>Engine connection issue</strong>
-              <span>{error}</span>
+        {screen === 'home' ? <HomeScreen onStart={(nextMode) => void startGame(nextMode)} /> : (
+          <>
+            <div className="game-topline">
+              <div><span className="eyebrow">NOW PLAYING</span><h1>{mode === 'human' ? 'Local match' : 'Play the machine'}</h1></div>
+              <span className="match-tag">{mode === 'human' ? 'HUMAN VS HUMAN' : 'HUMAN VS MACHINE'}</span>
             </div>
-            <button type="button" onClick={() => void loadGame()}>Try again</button>
-          </div>
-        )}
-
-        {state ? (
-          <div className="game-layout">
-            <section className="board-section" aria-label="Game board">
-              <div className="player-strip player-strip--black">
-                <span className="player-token player-token--black" aria-hidden="true" />
-                <div><strong>Onyx</strong><small>Black</small></div>
-                {state.currentTurn === 'black' && <span className="active-turn">To move</span>}
+            {error && <div className="error-banner" role="alert"><div><strong>Game connection issue</strong><span>{error}</span></div><button type="button" onClick={() => void resetGame()}>Try again</button></div>}
+            {state ? (
+              <div className="game-layout">
+                <section className="board-section" aria-label="Game board">
+                  <PlayerStrip side={topSide} currentTurn={state.currentTurn} mode={mode} />
+                  <Board state={state} orientation={orientation} selectedSquare={selectedSquare} legalMoves={legalMoves} disabled={isLoading || mode === 'machine' || state.isAiThinking || state.status.code === 'terminal'} busy={isLoading || state.isAiThinking} onSquareClick={(square) => void handleSquareClick(square)} />
+                  <PlayerStrip side={orientation} currentTurn={state.currentTurn} mode={mode} />
+                </section>
+                <GameSidebar state={state} mode={mode} orientation={orientation} disabled={isLoading} onReset={() => void resetGame()} onFlip={flipBoard} onHome={goHome} />
+                {state.status.code === 'terminal' && <ResultModal status={state.status} onRematch={() => void resetGame()} onHome={goHome} />}
               </div>
-              <Board
-                state={state}
-                selectedSquare={selectedSquare}
-                legalMoves={legalMoves}
-                disabled={isLoading || state.isAiThinking || state.status.code === 'terminal'}
-                onSquareClick={(square) => void handleSquareClick(square)}
-              />
-              <div className="player-strip">
-                <span className="player-token player-token--white" aria-hidden="true" />
-                <div><strong>Ivory</strong><small>White</small></div>
-                {state.currentTurn === 'white' && <span className="active-turn">To move</span>}
-              </div>
-            </section>
-            <GameSidebar state={state} disabled={isLoading} onReset={() => void handleReset()} />
-          </div>
-        ) : (
-          <div className="initial-loading" role="status">
-            <span className="spinner" />
-            <strong>Preparing the board</strong>
-            <p>Waiting for the game adapter...</p>
-          </div>
+            ) : <div className="initial-loading" role="status"><span className="spinner" /><strong>Preparing the board</strong><p>Connecting to the Chaturanga game core...</p></div>}
+          </>
         )}
       </main>
-
     </div>
   )
 }

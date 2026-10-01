@@ -10,6 +10,9 @@ interface SquareProps {
   isLegalDestination: boolean
   isCaptureDestination: boolean
   isLastMove: boolean
+  isLastMoveDestination: boolean
+  showRank: boolean
+  showFile: boolean
   disabled: boolean
   onClick: () => void
 }
@@ -23,6 +26,9 @@ export function Square({
   isLegalDestination,
   isCaptureDestination,
   isLastMove,
+  isLastMoveDestination,
+  showRank,
+  showFile,
   disabled,
   onClick,
 }: SquareProps) {
@@ -34,6 +40,7 @@ export function Square({
     isLegalDestination && 'square--legal',
     isCaptureDestination && 'square--capture',
     isLastMove && 'square--last-move',
+    isLastMoveDestination && 'square--move-arrival',
   ]
     .filter(Boolean)
     .join(' ')
@@ -47,8 +54,8 @@ export function Square({
       aria-label={`${square.id}${piece ? `, ${piece.side} ${piece.kind}` : ''}`}
       aria-pressed={isSelected}
     >
-      {square.file === 'a' && <span className="coordinate coordinate--rank">{square.rank}</span>}
-      {square.rank === 1 && <span className="coordinate coordinate--file">{square.file}</span>}
+      {showRank && <span className="coordinate coordinate--rank">{square.rank}</span>}
+      {showFile && <span className="coordinate coordinate--file">{square.file}</span>}
       {piece && <Piece piece={piece} />}
       {isLegalDestination && !isCaptureDestination && (
         <span className="move-marker" aria-hidden="true" />
