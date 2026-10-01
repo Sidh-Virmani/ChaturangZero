@@ -3,12 +3,14 @@
 from .arena import ArenaResult, compare_models
 from .config import TrainingConfig
 from .data import ReplayBuffer, TrainingExample
+from .levels import LevelProgress, train_levels
 from .self_play import SelfPlayResult, play_game, smoke_position
 from .trainer import IterationMetrics, Trainer
 
 __all__ = [
     "ArenaResult",
     "IterationMetrics",
+    "LevelProgress",
     "ReplayBuffer",
     "SelfPlayResult",
     "Trainer",
@@ -17,4 +19,5 @@ __all__ = [
     "compare_models",
     "play_game",
     "smoke_position",
+    "train_levels",
 ]

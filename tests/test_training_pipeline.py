@@ -9,7 +9,7 @@ from p1_representation import ACTION_SPACE_SIZE, STATE_SHAPE, encode_state, lega
 from p2_neural_network import ModelConfig, NetworkEvaluator, load_checkpoint
 from p4_training import (
     ReplayBuffer, Trainer, TrainingConfig, TrainingExample, compare_models,
-    play_game, smoke_position,
+    play_game, smoke_position, train_levels,
 )
 from shared.game_core import (
     GameState, Move, Piece, PieceType, Side, apply_move, initial_state,
@@ -184,6 +184,60 @@ def test_resume_restores_random_streams_and_optimizer_for_identical_continuation
     assert resumed.history == first.history
     for expected, actual in zip(first_weights, resumed.model.parameters(), strict=True):
         torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+
+
+def test_level_training_resumes_one_model_and_preserves_milestones(tmp_path):
+    initial = Trainer(quick_config(tmp_path))
+    initial.run(smoke_position())
+    easy = tmp_path / "easy.pt"
+    easy.write_bytes((tmp_path / "latest_model.pt").read_bytes())
+    easy_before = easy.read_bytes()
+    progress = []
+
+    trainer = train_levels(
+        quick_config(tmp_path, iterations=99),
+        easy=1,
+        medium=2,
+        hard=3,
+        start_state=smoke_position(),
+        on_iteration=progress.append,
+    )
+
+    assert trainer.completed_iterations == 3
+    assert [item.metrics.iteration for item in progress] == [2, 3]
+    assert [item.milestone for item in progress] == ["medium", "hard"]
+    assert all(item.elapsed_seconds >= 0 and item.estimated_remaining_seconds >= 0 for item in progress)
+    assert easy.read_bytes() == easy_before
+    assert all((tmp_path / name).is_file() for name in (
+        "easy.pt", "medium.pt", "hard.pt", "latest_model.pt", "training_state.pt",
+    ))
+
+    hard_model = load_checkpoint(tmp_path / "hard.pt")
+    latest_model = load_checkpoint(tmp_path / "latest_model.pt")
+    for hard_parameter, latest_parameter in zip(
+        hard_model.parameters(), latest_model.parameters(), strict=True
+    ):
+        torch.testing.assert_close(hard_parameter, latest_parameter, rtol=0, atol=0)
+
+    completed = train_levels(
+        quick_config(tmp_path), easy=1, medium=2, hard=3,
+        start_state=smoke_position(),
+    )
+    assert completed.completed_iterations == 3
+    assert easy.read_bytes() == easy_before
+
+
+def test_level_training_rejects_invalid_or_unrecoverable_milestones(tmp_path):
+    with pytest.raises(ValueError, match="0 < easy < medium < hard"):
+        train_levels(quick_config(tmp_path), easy=2, medium=2, hard=3)
+
+    trainer = Trainer(quick_config(tmp_path, iterations=2))
+    trainer.run(smoke_position())
+    with pytest.raises(FileNotFoundError, match="iteration 1 has already passed"):
+        train_levels(
+            quick_config(tmp_path), easy=1, medium=2, hard=3,
+            start_state=smoke_position(),
+        )
 
 
 def test_optional_arena_alternates_colors_without_noise(tmp_path):

@@ -175,6 +175,24 @@ To continue the saved run for two **more** iterations:
 .\.venv\Scripts\python.exe -m p4_training resume --output checkpoints\run1 --iterations 2
 ```
 
+For the final demo, one command can start a normal run or resume it after an interruption, save three permanent strength milestones, and stop at the Hard iteration:
+
+```powershell
+.\.venv\Scripts\python.exe -m p4_training train-levels --output checkpoints\final_models --easy 10 --medium 30 --hard 60
+```
+
+The first invocation creates a normal model using the same defaults as `train`. Later invocations of the exact command find `training_state.pt` and restore the same model, optimizer, replay examples, random streams, and saved training settings. They continue from the next unfinished iteration rather than starting over. On resume, options such as games, simulations, batch size, and architecture come from `training_state.pt`; `--device` may select the device used for the resumed process.
+
+At iterations 10, 30, and 60, the command copies the exact current P2 model to `easy.pt`, `medium.pt`, and `hard.pt`. It opens milestone names in no-overwrite mode, so an existing level file is kept. If a milestone iteration passed without its file, the command stops with an error because the exact earlier model can no longer be reconstructed. `latest_model.pt` and `training_state.pt` are still refreshed after every iteration, and the command stops automatically after iteration 60.
+
+Each completed iteration prints its metrics plus a line such as:
+
+```text
+iteration=12/60 elapsed=00:18:42 eta=14:57:36
+```
+
+The remaining-time estimate uses the average duration of iterations completed during the current invocation. It becomes more useful after several iterations. The normal defaults remain 2 games per iteration, 25 MCTS simulations per move, a 512-ply game cap, 50 network updates per iteration, batch size 64, and CPU. Use `--device cuda` only on a machine where PyTorch reports CUDA support.
+
 To compare two model checkpoints after training:
 
 ```powershell
@@ -195,7 +213,7 @@ The full project regression suite also covers P1, P2, P3, the game core, and its
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-Result: **84 passed**.
+Result after adding final-demo milestone training: **90 passed**.
 
 The resume CLI was also run in a separate process against the smoke checkpoint. It advanced to iteration 2, retained the first game's replay example, and made another update. Its new game reached the smoke configuration's four-ply cap, so it correctly added zero new examples and reported one truncated game.
 
@@ -209,11 +227,13 @@ The resume CLI was also run in a separate process against the smoke checkpoint. 
 
 **`p4_training/trainer.py`** connects self-play, replay sampling, P2 updates, metrics, and full checkpoint/resume state.
 
+**`p4_training/levels.py`** runs one continuous trainer up to Easy, Medium, and Hard iteration milestones, preserves each level checkpoint, and calculates per-iteration timing estimates.
+
 **`p4_training/arena.py`** contains the optional model-versus-model comparison.
 
-**`p4_training/__main__.py`** supplies the `smoke`, `train`, `resume`, and `arena` commands. **`p4_training/__init__.py`** exposes the small Python API.
+**`p4_training/__main__.py`** supplies the `smoke`, `train`, `train-levels`, `resume`, and `arena` commands. **`p4_training/__init__.py`** exposes the small Python API.
 
-**`tests/test_training_pipeline.py`** checks the P4 behavior. The existing P1/P2/P3/core tests remain unchanged.
+**`tests/test_training_pipeline.py`** also checks continuous milestone training, exact Hard/latest equivalence, resume, milestone validation, and no-overwrite behavior. The existing P1/P2/P3/core tests remain unchanged.
 
 ## 14. How a trained checkpoint can later reach the UI
 
