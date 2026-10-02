@@ -174,12 +174,63 @@ def test_temperature_sampling_vs_argmax() -> None:
     expected_action = move_to_action(moves[2])
     assert np.count_nonzero(greedy) == 1
     assert greedy[expected_action] == 1.0
-    assert MCTS._select_action(greedy, temperature=0.0) == expected_action
+    legal_actions = [move_to_action(move) for move in moves]
+    assert MCTS._select_action(greedy, temperature=0.0, legal_actions=legal_actions) == expected_action
 
     sampling = MCTS._policy_from_visits(root, temperature=1.0)
     actual = sampling[[move_to_action(move) for move in moves]]
     np.testing.assert_allclose(actual, np.array([0.1, 0.3, 0.6]), atol=1e-7)
     assert sampling.sum() == pytest.approx(1.0)
+
+
+def test_action_sampling_repairs_float32_normalization_drift(monkeypatch) -> None:
+    legal = np.array([7, 203, 3112], dtype=np.int64)
+    policy = np.zeros(ACTION_SPACE_SIZE, dtype=np.float32)
+    policy[legal] = np.array([0.1, 0.2, 0.70000005], dtype=np.float32)
+    policy[99] = 0.5  # Even a positive illegal entry must remain unavailable.
+    captured = {}
+
+    def capture_choice(size, p):
+        captured["size"] = size
+        captured["probabilities"] = p.copy()
+        return int(legal[-1])
+
+    monkeypatch.setattr(np.random, "choice", capture_choice)
+    selected = MCTS._select_action(policy, temperature=1.0, legal_actions=legal)
+    probabilities = captured["probabilities"]
+
+    assert selected == int(legal[-1])
+    assert captured["size"] == ACTION_SPACE_SIZE
+    assert probabilities.dtype == np.float64
+    assert probabilities.sum(dtype=np.float64) == 1.0
+    assert probabilities[99] == 0.0
+    assert np.all(probabilities[np.setdiff1d(np.arange(ACTION_SPACE_SIZE), legal)] == 0.0)
+    expected = policy[legal].astype(np.float64)
+    expected /= expected.sum()
+    np.testing.assert_allclose(probabilities[legal], expected, rtol=0, atol=1e-15)
+
+
+def test_action_sampling_replaces_invalid_weights_with_legal_fallback(monkeypatch) -> None:
+    legal = np.array([4, 18, 507, 4090], dtype=np.int64)
+    policy = np.zeros(ACTION_SPACE_SIZE, dtype=np.float64)
+    policy[legal] = [np.nan, np.inf, -0.25, 0.0]
+    policy[100] = 1.0  # Illegal mass must not be used as a fallback.
+    captured = {}
+
+    def capture_choice(size, p):
+        captured["probabilities"] = p.copy()
+        return int(legal[1])
+
+    monkeypatch.setattr(np.random, "choice", capture_choice)
+    selected = MCTS._select_action(policy, temperature=1.0, legal_actions=legal)
+    probabilities = captured["probabilities"]
+
+    assert selected == int(legal[1])
+    assert np.isfinite(probabilities).all()
+    assert np.all(probabilities >= 0.0)
+    assert probabilities.sum(dtype=np.float64) == 1.0
+    np.testing.assert_allclose(probabilities[legal], np.full(4, 0.25))
+    assert np.count_nonzero(probabilities) == len(legal)
 
 
 def test_policy_output_shape_and_legality() -> None:

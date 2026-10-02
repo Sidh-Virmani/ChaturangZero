@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from numbers import Integral
-from typing import Callable, Optional
+from typing import Callable, Iterable, Optional
 
 import numpy as np
 
@@ -79,7 +79,9 @@ class MCTS:
                 on_simulation(simulation)
 
         policy = self._policy_from_visits(root, search_config.temperature)
-        chosen_action = self._select_action(policy, search_config.temperature)
+        chosen_action = self._select_action(
+            policy, search_config.temperature, root.children.keys()
+        )
         return policy, action_to_move(chosen_action), chosen_action
 
     def step(self, action: int | Move) -> None:
@@ -171,7 +173,52 @@ class MCTS:
         return policy
 
     @staticmethod
-    def _select_action(policy: np.ndarray, temperature: float) -> int:
+    def _select_action(
+        policy: np.ndarray,
+        temperature: float,
+        legal_actions: Iterable[int],
+    ) -> int:
+        """Select only among legal actions from a safe float64 distribution."""
+        raw = np.asarray(policy, dtype=np.float64)
+        if raw.shape != (ACTION_SPACE_SIZE,):
+            raise ValueError(f"Policy must have shape ({ACTION_SPACE_SIZE},)")
+
+        actions = np.fromiter(legal_actions, dtype=np.int64)
+        if actions.size == 0:
+            raise RuntimeError("Cannot select an action without legal actions")
+        if np.any(actions < 0) or np.any(actions >= ACTION_SPACE_SIZE):
+            raise ValueError("Legal action ID is outside the action space")
+        if np.unique(actions).size != actions.size:
+            raise ValueError("Legal action IDs must be unique")
+
+        # Copy only positive finite weights at explicitly legal indices. This
+        # simultaneously removes invalid values and keeps every illegal action
+        # at exactly zero.
+        probabilities = np.zeros(ACTION_SPACE_SIZE, dtype=np.float64)
+        legal_weights = raw[actions]
+        usable = np.isfinite(legal_weights) & (legal_weights > 0.0)
+        if np.any(usable):
+            usable_actions = actions[usable]
+            weights = legal_weights[usable]
+            # Scaling prevents overflow if an external caller supplies very
+            # large finite weights; it does not change their relative ratios.
+            weights = weights / float(weights.max())
+            total = float(weights.sum(dtype=np.float64))
+            probabilities[usable_actions] = weights / total
+            largest = int(usable_actions[int(np.argmax(weights))])
+        else:
+            # Search normally supplies visit probabilities. If all of them are
+            # unusable, uniform legal sampling is the least biased fallback.
+            probabilities[actions] = 1.0 / float(actions.size)
+            largest = int(actions[0])
+
+        # NumPy checks float64 sums more strictly than the float32 policy used
+        # by the training target. Put the final rounding residue on one legal,
+        # positive entry before calling choice.
+        probabilities[largest] += 1.0 - float(
+            probabilities.sum(dtype=np.float64)
+        )
+
         if temperature < 1e-4:
-            return int(np.argmax(policy))
-        return int(np.random.choice(ACTION_SPACE_SIZE, p=policy.astype(np.float64)))
+            return int(np.argmax(probabilities))
+        return int(np.random.choice(ACTION_SPACE_SIZE, p=probabilities))
