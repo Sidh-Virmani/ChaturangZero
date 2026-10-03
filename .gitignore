@@ -32,3 +32,7 @@ checkpoints/*
 # OS
 .DS_Store
 Thumbs.db
+
+# Local verification reports and development logs
+/output/verification/
+/output/runtime/

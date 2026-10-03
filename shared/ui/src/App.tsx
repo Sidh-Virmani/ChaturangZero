@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { Board } from './components/Board'
+import { BoardExperience } from './components/BoardExperience'
 import { GameSidebar } from './components/GameSidebar'
 import { HomeScreen } from './components/HomeScreen'
 import { PlayerStrip } from './components/PlayerStrip'
@@ -204,7 +204,7 @@ function App() {
               <div className={`game-layout game-layout--${mode}`}>
                 <section className="board-section" aria-label="Game board">
                   <PlayerStrip side={topSide} currentTurn={state.currentTurn} mode={mode} />
-                  <Board state={state} orientation={orientation} selectedSquare={selectedSquare} legalMoves={legalMoves} disabled={isLoading || isAiThinking || state.status.code === 'terminal' || (mode === 'machine' && (!state.machineReady || state.currentTurn !== 'white'))} busy={isLoading} busyLabel="Syncing with engine..." onSquareClick={(square) => void handleSquareClick(square)} />
+                  <BoardExperience state={state} orientation={orientation} selectedSquare={selectedSquare} legalMoves={legalMoves} disabled={isLoading || isAiThinking || state.status.code === 'terminal' || (mode === 'machine' && (!state.machineReady || state.currentTurn !== 'white'))} busy={isLoading} thinking={isAiThinking} onSquareClick={(square) => void handleSquareClick(square)} />
                   <PlayerStrip side={orientation} currentTurn={state.currentTurn} mode={mode} />
                 </section>
                 <GameSidebar state={state} mode={mode} orientation={orientation} thinking={isAiThinking} progress={machineProgress} machineResult={machineResult} disabled={isLoading || isAiThinking} onReset={() => void resetGame()} onFlip={flipBoard} />

@@ -69,6 +69,7 @@ class GameSession:
     analysis: dict[str, Any] | None = None
     search_generation: int = 0
     search_status_data: dict[str, Any] | None = None
+    position_revision: int = 0
 
     def reset(self, mode: str = "human") -> dict[str, Any]:
         if mode not in ("human", "machine"):
@@ -85,6 +86,7 @@ class GameSession:
                     except (OSError, ValueError, KeyError, RuntimeError) as error:
                         raise RuntimeError(f"Could not load machine checkpoint: {error}") from error
             self.game.reset()
+            self.position_revision += 1
             self.search_generation += 1
             self.search_status_data = None
             self.history.clear()
@@ -123,6 +125,7 @@ class GameSession:
             if moving_piece is None:
                 raise IllegalMoveError(f"There is no piece on {from_name}")
             self.game.apply(move)
+            self.position_revision += 1
             self.history.append(
                 MoveRecord(
                     ply=self.game.state.ply_count,
@@ -176,6 +179,7 @@ class GameSession:
             if moving_piece is None:  # pragma: no cover - core/search invariant
                 raise RuntimeError("Machine selected an empty source square")
             self.game.apply(move)
+            self.position_revision += 1
             self.history.append(MoveRecord(
                 ply=self.game.state.ply_count,
                 side=moving_piece.side,
@@ -196,6 +200,30 @@ class GameSession:
                         "simulationsCompleted": 0, "totalSimulations": 0,
                         "done": True, "error": None}
             return {**self.search_status_data, "events": list(self.search_status_data["events"])}
+
+    def network_snapshot(self) -> dict[str, Any]:
+        """Inspect a consistent position without holding the game lock during inference."""
+        from integration.network_inspector import inspect_position
+        from integration.ai_player import MachinePlayer, configured_checkpoint
+
+        with self.lock:
+            if self.search_status_data is not None and not self.search_status_data["done"]:
+                raise RuntimeError("The inspector will refresh when the machine search finishes")
+            if self.machine is None:
+                checkpoint = configured_checkpoint()
+                if checkpoint is not None:
+                    try:
+                        self.machine = MachinePlayer(checkpoint, int(os.environ.get("CHATURANGZERO_SIMULATIONS", "32")))
+                    except (OSError, ValueError, KeyError, RuntimeError) as error:
+                        raise RuntimeError(f"Could not load machine checkpoint: {error}") from error
+            machine, state, revision = self.machine, self.game.state, self.position_revision
+        snapshot = machine.inspect(state) if machine is not None else inspect_position(state, None)
+        with self.lock:
+            if self.position_revision != revision:
+                raise RuntimeError("The board changed during inspection; refresh the inspector")
+        return {**snapshot, "positionKey": str(revision),
+                "checkpoint": machine.label if machine else None,
+                "smokeCheckpoint": machine.is_smoke if machine else False}
 
     def _publish_search_progress(self, generation: int, stage: str, data: dict[str, Any]) -> None:
         with self.lock:
@@ -271,6 +299,7 @@ class GameSession:
             )
 
         return {
+            "positionKey": str(self.position_revision),
             "pieces": pieces,
             "currentTurn": state.side_to_move.value,
             "selectableSquares": selectable,
@@ -299,6 +328,9 @@ class GameApiHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/game/ai/status":
                 self._send_json(HTTPStatus.OK, self.session.search_status())
                 return
+            if parsed.path == "/api/game/network":
+                self._send_json(HTTPStatus.OK, self.session.network_snapshot())
+                return
             if parsed.path == "/api/game/legal-moves":
                 source = parse_qs(parsed.query).get("from", [""])[0]
                 if not source:
@@ -308,6 +340,8 @@ class GameApiHandler(BaseHTTPRequestHandler):
             self._send_error(HTTPStatus.NOT_FOUND, "API route not found")
         except (ValueError, IllegalMoveError, GameOverError) as error:
             self._send_error(HTTPStatus.BAD_REQUEST, str(error))
+        except RuntimeError as error:
+            self._send_error(HTTPStatus.SERVICE_UNAVAILABLE, str(error))
 
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         parsed = urlparse(self.path)

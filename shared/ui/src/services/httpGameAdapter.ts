@@ -1,5 +1,6 @@
 import type { GameAdapter } from './gameAdapter'
 import type { BoardState, GameMode, LegalMove, MachineProgress, SquareId } from '../types/game'
+import type { NeuralInspection } from '../types/neural'
 
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
@@ -54,6 +55,10 @@ export class HttpGameAdapter implements GameAdapter {
 
   getMachineProgress(): Promise<MachineProgress> {
     return apiRequest<MachineProgress>('/api/game/ai/status')
+  }
+
+  getNetworkInspection(signal?: AbortSignal): Promise<NeuralInspection> {
+    return apiRequest<NeuralInspection>('/api/game/network', { signal })
   }
 }
 

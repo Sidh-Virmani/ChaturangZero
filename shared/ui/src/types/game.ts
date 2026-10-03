@@ -81,6 +81,7 @@ export interface MachineProgress {
 }
 
 export interface BoardState {
+  positionKey?: string
   pieces: Piece[]
   currentTurn: Side
   selectableSquares: SquareId[]

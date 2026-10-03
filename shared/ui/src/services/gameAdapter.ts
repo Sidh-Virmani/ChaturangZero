@@ -1,4 +1,5 @@
 import type { BoardState, GameMode, LegalMove, MachineProgress, SquareId } from '../types/game'
+import type { NeuralInspection } from '../types/neural'
 
 /**
  * The only boundary the React application uses to communicate with game logic.
@@ -12,4 +13,5 @@ export interface GameAdapter {
   resetGame(mode: GameMode): Promise<BoardState>
   requestMachineMove(): Promise<BoardState>
   getMachineProgress(): Promise<MachineProgress>
+  getNetworkInspection(signal?: AbortSignal): Promise<NeuralInspection>
 }

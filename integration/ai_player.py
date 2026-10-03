@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from pathlib import Path
 from typing import Any, Callable
 
@@ -46,6 +47,12 @@ class MachinePlayer:
         )
         self.label = str(self.checkpoint.relative_to(PROJECT_ROOT)) if self.checkpoint.is_relative_to(PROJECT_ROOT) else self.checkpoint.name
         self.is_smoke = self.checkpoint.parent.name == "p4_smoke"
+        self.inference_lock = threading.RLock()
+
+    def inspect(self, state: GameState) -> dict[str, Any]:
+        from .network_inspector import inspect_position
+        with self.inference_lock:
+            return inspect_position(state, self.evaluator)
 
     def choose(
         self,
@@ -53,6 +60,13 @@ class MachinePlayer:
         on_progress: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> tuple[Move, dict[str, Any]]:
         """Return a legal selected move and measurements from this exact search."""
+        with self.inference_lock:
+            return self._choose(state, on_progress)
+
+    def _choose(
+        self, state: GameState,
+        on_progress: Callable[[str, dict[str, Any]], None] | None = None,
+    ) -> tuple[Move, dict[str, Any]]:
         def report(stage: str, **data: Any) -> None:
             if on_progress is not None:
                 on_progress(stage, data)
