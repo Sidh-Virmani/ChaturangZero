@@ -3,7 +3,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { createPiece, createPieceMaterials, disposeGroup } from './pieces'
-import type { BoardState, LegalMove, Piece, Side, SquareId } from '../types/game'
+import { createCaptureEffects } from './captureEffects'
+import { movePose, defeatPose, isSequentialMove, CAPTURE_MS, MOVE_MS, IMPACT_MS, DEPLOY_MS } from './motion'
+import type { BoardState, LegalMove, Move, Piece, Side, SquareId } from '../types/game'
 import type { InspectCell, NeuralInspection, NeuralLayer } from '../types/neural'
 
 export interface SceneSettings {
@@ -18,16 +20,23 @@ export interface SceneSettings {
   channel: number // -1: mean absolute activation
   replay: boolean
   resetCamera: number
+  paused?: boolean // another 3D preview is covering this canvas
+  showcase?: boolean
 }
 
-interface Actor { mesh: THREE.Group; piece: Piece; from: THREE.Vector3; to: THREE.Vector3; started: number; retiring: boolean; hop: number }
+interface Actor {
+  mesh: THREE.Group; piece: Piece; from: THREE.Vector3; to: THREE.Vector3; started: number
+  retiring: boolean; moving: boolean; deploying: boolean; capture: boolean
+  attackKind: Piece['kind']; direction: number; promotion: Piece['kind'] | null
+}
 interface Stage { layer: NeuralLayer; group: THREE.Group; bars: THREE.InstancedMesh; slab: THREE.Mesh; target: THREE.Vector3; scale: number; values: number[]; label: HTMLSpanElement }
 const point = (square: string) => new THREE.Vector3(square.charCodeAt(0) - 97 - 3.5, .34, 4.5 - Number(square[1]))
 const ease = (t: number) => t < .5 ? 16 * t ** 5 : 1 - (-2 * t + 2) ** 5 / 2
 
 /** Imperative scene, owned by one React component. No game rules live here. */
 export function createBoardScene(host: HTMLDivElement, onSquare: (square: SquareId) => void,
-  onHover: (cell: InspectCell | null) => void, onFocus: (id: string) => void, onFailure: () => void) {
+  onHover: (cell: InspectCell | null) => void, onFocus: (id: string) => void, onFailure: () => void,
+  onMotion: (busy: boolean, move?: Move | null) => void = () => {}) {
   let settings: SceneSettings | null = null
   let disposed = false, raf = 0, visible = true, lastTime = 0
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -47,13 +56,14 @@ export function createBoardScene(host: HTMLDivElement, onSquare: (square: Square
   const pmrem = new THREE.PMREMGenerator(renderer)
   const environmentTarget = pmrem.fromScene(environment, .06)
   scene.environment = environmentTarget.texture
-  scene.environmentIntensity = .55
+  scene.environmentIntensity = .65
   environment.dispose(); pmrem.dispose()
   const camera = new THREE.PerspectiveCamera(38, 1, .1, 150)
   camera.position.set(9, 11, 14)
   const controls = new OrbitControls(camera, renderer.domElement)
   controls.enableDamping = true; controls.dampingFactor = .085
-  controls.enablePan = false; controls.enableZoom = false
+  controls.enablePan = false; controls.enableZoom = true
+  controls.minDistance = 4; controls.maxDistance = 75; controls.zoomSpeed = .7
   controls.minPolarAngle = .12; controls.maxPolarAngle = Math.PI * .49
   controls.target.set(0, .1, 0)
   const hemi = new THREE.HemisphereLight('#e3e9ff', '#2a2135', 1.45)
@@ -66,12 +76,29 @@ export function createBoardScene(host: HTMLDivElement, onSquare: (square: Square
   scene.add(key)
   const rim = new THREE.DirectionalLight('#97d6e8', 1.6)
   rim.position.set(4, 5, -7); scene.add(rim)
+  const fill = new THREE.DirectionalLight('#d5a8a6', .7)
+  fill.position.set(-6, 3, -4); scene.add(fill)
   const board = new THREE.Group(); scene.add(board)
   const pieces = new THREE.Group(); board.add(pieces)
   const pieceMaterials = createPieceMaterials()
   const navy = new THREE.MeshStandardMaterial({ color: '#202b40', metalness: .42, roughness: .32 })
-  const darkTile = new THREE.MeshPhysicalMaterial({ color: '#27364b', roughness: .36, metalness: .18, clearcoat: .3 })
-  const lightTile = new THREE.MeshPhysicalMaterial({ color: '#c596a2', roughness: .38, metalness: .04, clearcoat: .3 })
+  const stoneTexture = (light: boolean) => {
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 256
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = light ? '#dbc1b5' : '#293c46'; ctx.fillRect(0, 0, 256, 256)
+    // Subtle deterministic mineral veining; no downloaded textures.
+    for (let i = 0; i < 12; i++) {
+      ctx.strokeStyle = light ? 'rgba(156,117,103,.075)' : 'rgba(136,170,164,.065)'
+      ctx.lineWidth = i % 3 === 0 ? 1.3 : .6; ctx.beginPath()
+      ctx.moveTo(-20, i * 27 - 32)
+      ctx.bezierCurveTo(65, i * 27 + 24, 110, i * 24 - 40, 276, i * 27 + 90); ctx.stroke()
+    }
+    const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace
+    texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); return texture
+  }
+  const darkStone = stoneTexture(false), lightStone = stoneTexture(true)
+  const darkTile = new THREE.MeshPhysicalMaterial({ color: '#f0f0f0', map: darkStone, roughness: .32, metalness: .16, clearcoat: .48 })
+  const lightTile = new THREE.MeshPhysicalMaterial({ color: '#fff6ef', map: lightStone, roughness: .3, metalness: .05, clearcoat: .48 })
   const gold = pieceMaterials.gold
   const glow = new THREE.MeshStandardMaterial({ color: '#529b9c', emissive: '#419eaa', emissiveIntensity: .9, roughness: .5 })
   const box = (width: number, height: number, depth: number, radius: number, material: THREE.Material, y: number) => {
@@ -84,6 +111,19 @@ export function createBoardScene(host: HTMLDivElement, onSquare: (square: Square
   box(9.14, .15, 9.14, .045, navy, .17)
   box(8.85, .035, 8.85, .02, gold, .26)
   box(8.79, .045, 8.79, .015, navy, .283)
+  // Two fine inlaid rails, rather than a visually heavy border.
+  for (const x of [-4.43, 4.43]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(.012, .009, 8.84), gold)
+    rail.position.set(x, .292, 0); board.add(rail)
+  }
+  for (const z of [-4.43, 4.43]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(8.84, .009, .012), gold)
+    rail.position.set(0, .292, z); board.add(rail)
+  }
+  for (const x of [-3.85, 3.85]) for (const z of [-3.85, 3.85]) {
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(.2, .16, .2, 24), gold)
+    foot.position.set(x, -.48, z); foot.castShadow = true; board.add(foot)
+  }
   const tileGeometry = new RoundedBoxGeometry(.997, .075, .997, 2, .016)
   const tiles: THREE.Mesh[] = []
   for (let rank = 1; rank <= 8; rank++) for (let file = 0; file < 8; file++) {
@@ -119,25 +159,59 @@ export function createBoardScene(host: HTMLDivElement, onSquare: (square: Square
     }
   }
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.ShadowMaterial({ opacity: .28 }))
-  floor.rotation.x = -Math.PI / 2; floor.position.y = -.43; floor.receiveShadow = true; scene.add(floor)
+  floor.rotation.x = -Math.PI / 2; floor.position.y = -.59; floor.receiveShadow = true; scene.add(floor)
+  const haloCanvas = document.createElement('canvas'); haloCanvas.width = haloCanvas.height = 128
+  const haloContext = haloCanvas.getContext('2d')!
+  const gradient = haloContext.createRadialGradient(64, 64, 8, 64, 64, 64)
+  gradient.addColorStop(0, '#70c6bb60'); gradient.addColorStop(.5, '#4ca7a72c'); gradient.addColorStop(1, '#4ca7a700')
+  haloContext.fillStyle = gradient; haloContext.fillRect(0, 0, 128, 128)
+  const haloTexture = new THREE.CanvasTexture(haloCanvas)
+  const halo = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: haloTexture, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }))
+  halo.rotation.x = -Math.PI / 2; halo.position.y = -.585; scene.add(halo)
   const templates = new Map<string, THREE.Group>()
   const actors: Actor[] = []
   const markers = new THREE.Group(); board.add(markers)
+  const captureRoot = new THREE.Group(); scene.add(captureRoot)
+  const captures = createCaptureEffects(captureRoot)
   const ringGeometry = new THREE.RingGeometry(.36, .395, 48)
   const dotGeometry = new THREE.CircleGeometry(.105, 32)
   const markerMaterial = new THREE.MeshBasicMaterial({ color: '#86ddd4', transparent: true, opacity: .85, depthWrite: false, side: THREE.DoubleSide })
   const lastMaterial = new THREE.MeshBasicMaterial({ color: '#f0c786', transparent: true, opacity: .3, depthWrite: false, side: THREE.DoubleSide })
   const lastGeometry = new THREE.PlaneGeometry(.91, .91)
+  const hoverMaterial = new THREE.MeshBasicMaterial({ color: '#e4c999', transparent: true, opacity: .2, depthWrite: false, side: THREE.DoubleSide })
+  const hoverTile = new THREE.Mesh(new THREE.PlaneGeometry(.94, .94), hoverMaterial)
+  hoverTile.rotation.x = -Math.PI / 2; hoverTile.visible = false; board.add(hoverTile)
+  const checkMaterial = new THREE.MeshBasicMaterial({ color: '#e6948b', transparent: true, opacity: .65, depthWrite: false, side: THREE.DoubleSide })
   const network = new THREE.Group(); scene.add(network)
   let stages: Stage[] = [], networkKey = '', positionKey = '', cameraKey = ''
   let boardOpacity = 1, activeStage = '', hoveredKey = ''
-  let boardMaterials: THREE.Material[] = []
+  const boardMaterials = new Map<THREE.Material, { opacity: number; transparent: boolean; depthWrite: boolean }>()
   let transition: { start: number; from: THREE.Vector3; to: THREE.Vector3; fromTarget: THREE.Vector3; target: THREE.Vector3 } | null = null
   let zoomVelocity = 0
   let measuredFrames = 0, measuredSince = 0
   const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2(), dummy = new THREE.Object3D()
   const tempColor = new THREE.Color(), cold = new THREE.Color('#1d3046'), warm = new THREE.Color('#4aa79e')
-  const resources = new THREE.Group() // owns cached geometry even after captures / layer refreshes
+  const resources = new THREE.Group() // owns cached geometry even after captures
+  resources.visible = false; scene.add(resources)
+  let receivedState: BoardState | null = null, displayedState: BoardState | null = null
+  let pending: BoardState[] = [], motionUntil = 0, motionBusy = false
+  const notifyMotion = (force = false) => {
+    const busy = motionUntil > 0 || pending.length > 0
+    if (force || busy !== motionBusy) { motionBusy = busy; onMotion(busy, busy ? displayedState?.lastMove : null) }
+  }
+  const rememberMaterials = () => {
+    board.traverse(object => {
+      if (object instanceof THREE.Mesh) for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+        if (!boardMaterials.has(material)) boardMaterials.set(material, { opacity: material.opacity, transparent: material.transparent, depthWrite: material.depthWrite })
+      }
+    })
+  }
+  const pieceTemplate = (piece: Piece) => {
+    const key = `${piece.side}-${piece.kind}`
+    let template = templates.get(key)
+    if (!template) { template = createPiece(piece.kind, piece.side, pieceMaterials); templates.set(key, template); resources.add(template) }
+    return template
+  }
   const pulseGeometry = new THREE.SphereGeometry(.06, 12, 8)
   const pulseMaterial = new THREE.MeshBasicMaterial({ color: '#bff9ed' })
   const pulses = [new THREE.Mesh(pulseGeometry, pulseMaterial), new THREE.Mesh(pulseGeometry, pulseMaterial)]
@@ -152,6 +226,13 @@ export function createBoardScene(host: HTMLDivElement, onSquare: (square: Square
   }
   const cameraDestination = () => {
     const ratio = Math.max(1, 1.35 / camera.aspect)
+    if (settings?.showcase && !settings.exploded) {
+      const move = settings.state.lastMove
+      const selected = settings.state.pieces.find(piece => piece.square === settings?.selectedSquare)
+      const target = move ? point(move.from).add(point(move.to)).multiplyScalar(.5) : selected ? point(selected.square).lerp(point('e5'), .5) : new THREE.Vector3()
+      target.y = .55
+      return setCamera(target, new THREE.Vector3(4.6, 6.7, 7.8).multiplyScalar(ratio))
+    }
     if (!settings?.exploded) return setCamera(new THREE.Vector3(0, .15, 0), new THREE.Vector3(8, 10, 12.5).multiplyScalar(ratio))
     const focused = stages.find(stage => stage.layer.id === settings?.focus)
     if (focused) {
@@ -169,46 +250,85 @@ export function createBoardScene(host: HTMLDivElement, onSquare: (square: Square
     cameraDestination()
   }
   const observer = new ResizeObserver(resize); observer.observe(host)
-  function reconcile(next: BoardState) {
-    const key = next.positionKey ?? `${next.currentTurn}:${next.pieces.map(p => p.id).join(',')}`
-    if (positionKey === key) return
-    const animatedMove = settings && next.moveHistory.length === settings.state.moveHistory.length + 1 ? next.lastMove : null
-    const unused = new Set(actors.filter(actor => !actor.retiring))
+  function hydrate(next: BoardState, deploy = false) {
+    pieces.clear(); actors.length = 0; pending = []; captures.clear(); hoverTile.visible = false
     const now = performance.now()
     for (const piece of next.pieces) {
-      let actor: Actor | undefined
-      if (animatedMove?.to === piece.square) actor = [...unused].find(a => a.piece.square === animatedMove.from && a.piece.side === piece.side && a.piece.kind === piece.kind)
-      actor ??= [...unused].find(a => a.piece.square === piece.square && a.piece.side === piece.side && a.piece.kind === piece.kind && !(animatedMove?.from === a.piece.square))
-      if (actor) {
-        unused.delete(actor); actor.piece = piece
-        actor.from.copy(actor.mesh.position); actor.to.copy(point(piece.square)); actor.started = now
-        actor.hop = animatedMove?.to === piece.square ? (piece.kind === 'ashva' || piece.kind === 'gaja' ? .3 : .12) : 0
-        actor.mesh.userData.square = piece.square
+      const mesh = pieceTemplate(piece).clone(true), destination = point(piece.square)
+      mesh.position.copy(destination); mesh.userData.square = piece.square; pieces.add(mesh)
+      const delay = deploy ? (Number(piece.square[1]) > 4 ? 80 : 0) + (piece.square.charCodeAt(0) - 97) * 24 : 0
+      actors.push({ mesh, piece, from: destination.clone(), to: destination, started: now + delay,
+        retiring: false, moving: false, deploying: deploy, capture: false, attackKind: piece.kind, direction: 0, promotion: null })
+    }
+    displayedState = next; motionUntil = deploy && actors.length ? now + DEPLOY_MS + 248 : 0
+    if (settings) updateMarkers({ ...settings, state: next })
+    // App reserves the visual turn before receiving this snapshot, even when
+    // reduced motion / inspection means that no animation will run.
+    rememberMaterials(); notifyMotion(true)
+  }
+  function beginMove(next: BoardState) {
+    const move = next.lastMove!
+    const attacker = actors.find(actor => !actor.retiring && actor.piece.square === move.from && actor.piece.side === move.side && actor.piece.kind === move.piece)
+    // Unknown / externally supplied snapshots are safe to show without inventing a move.
+    if (!attacker) { hydrate(next); return }
+    const victim = actors.find(actor => !actor.retiring && actor.piece.square === move.to && actor.piece.side !== move.side)
+    const now = performance.now(), capture = Boolean(victim)
+    const direction = Math.atan2(point(move.to).x - point(move.from).x, point(move.to).z - point(move.from).z)
+    for (const actor of actors) {
+      if (actor.retiring) continue
+      actor.mesh.position.copy(actor.to); actor.mesh.rotation.set(0, 0, 0); actor.mesh.scale.setScalar(1)
+      actor.deploying = false; actor.moving = false
+    }
+    if (victim) {
+      victim.retiring = true; victim.mesh.userData.retiring = true; victim.started = now
+      victim.from.copy(victim.mesh.position); victim.attackKind = move.piece; victim.direction = direction
+      captures.play(move.piece, move.side, point(move.from), point(move.to), now)
+    }
+    const unused = new Set(actors.filter(actor => !actor.retiring && actor !== attacker))
+    for (const piece of next.pieces) {
+      if (piece.square === move.to && piece.side === move.side) {
+        attacker.from.copy(point(move.from)); attacker.to.copy(point(move.to)); attacker.started = now
+        attacker.capture = capture; attacker.moving = true; attacker.attackKind = move.piece; attacker.direction = direction
+        attacker.promotion = attacker.piece.kind !== piece.kind ? piece.kind : null
+        attacker.piece = piece; attacker.mesh.userData.square = piece.square
       } else {
-        const key = `${piece.side}-${piece.kind}`
-        let template = templates.get(key)
-        if (!template) { template = createPiece(piece.kind, piece.side, pieceMaterials); templates.set(key, template); resources.add(template) }
-        const promoted = animatedMove?.to === piece.square ? [...unused].find(a => a.piece.square === animatedMove.from && a.piece.side === piece.side && a.piece.kind === 'padati') : undefined
-        const mesh = template.clone(true); mesh.position.copy(promoted?.mesh.position ?? point(piece.square)); pieces.add(mesh)
-        mesh.userData.square = piece.square
-        actors.push({ mesh, piece, from: mesh.position.clone(), to: point(piece.square), started: now, retiring: false, hop: promoted ? .12 : 0 })
+        const existing = [...unused].find(actor => actor.piece.square === piece.square && actor.piece.kind === piece.kind && actor.piece.side === piece.side)
+        if (!existing) { hydrate(next); return }
+        unused.delete(existing); existing.piece = piece
       }
     }
-    unused.forEach(actor => {
-      if (animatedMove) { actor.retiring = true; actor.mesh.userData.retiring = true; actor.started = now; actor.from.copy(actor.mesh.position) }
-      else { pieces.remove(actor.mesh); actors.splice(actors.indexOf(actor), 1) }
-    })
-    positionKey = key
+    if (unused.size) { hydrate(next); return }
+    displayedState = next; motionUntil = now + (capture ? CAPTURE_MS : MOVE_MS)
+    if (settings) updateMarkers({ ...settings, state: next })
+    rememberMaterials(); notifyMotion(true)
+  }
+  function reconcile(next: BoardState) {
+    const key = next.positionKey ?? `${next.currentTurn}:${next.moveHistory.length}:${next.pieces.map(p => `${p.kind}:${p.side}:${p.square}`).join(',')}`
+    if (positionKey === key) return
+    const previous = receivedState
+    receivedState = next; positionKey = key
+    if (!previous || !isSequentialMove(previous, next)) { hydrate(next, !reduced.matches && !settings?.exploded); return }
+    if (reduced.matches || settings?.exploded || settings?.paused || !visible) { hydrate(next); return }
+    // A fast AI reply is presented after its preceding move, never over it.
+    if (motionUntil) {
+      pending.push(next)
+      if (pending.length > 4) hydrate(next)
+    } else beginMove(next)
+    notifyMotion()
   }
   function updateMarkers(next: SceneSettings) {
     markers.clear()
-    const mark = (square: string, geometry: THREE.BufferGeometry, material: THREE.Material, y = .346) => {
+    const mark = (square: string, geometry: THREE.BufferGeometry, material: THREE.Material, y = .346, pulse = false) => {
       const mesh = new THREE.Mesh(geometry, material); mesh.rotation.x = -Math.PI / 2
-      mesh.position.copy(point(square)); mesh.position.y = y; markers.add(mesh)
+      mesh.position.copy(point(square)); mesh.position.y = y; mesh.userData.pulse = pulse; markers.add(mesh)
     }
     if (next.state.lastMove) { mark(next.state.lastMove.from, lastGeometry, lastMaterial); mark(next.state.lastMove.to, lastGeometry, lastMaterial) }
-    if (next.selectedSquare) mark(next.selectedSquare, ringGeometry, markerMaterial, .354)
-    next.legalMoves.forEach(move => mark(move.to, move.isCapture ? ringGeometry : dotGeometry, markerMaterial, .355))
+    if (next.selectedSquare) mark(next.selectedSquare, ringGeometry, markerMaterial, .354, true)
+    next.legalMoves.forEach(move => mark(move.to, move.isCapture ? ringGeometry : dotGeometry, markerMaterial, .355, true))
+    if (next.state.status.code === 'check') {
+      const king = next.state.pieces.find(piece => piece.kind === 'raja' && piece.side === next.state.currentTurn)
+      if (king) mark(king.square, ringGeometry, checkMaterial, .358, true)
+    }
   }
   function buildNetwork(inspection: NeuralInspection | null) {
     stages.forEach(stage => {
@@ -239,6 +359,7 @@ export function createBoardScene(host: HTMLDivElement, onSquare: (square: Square
       const channels = stage.layer.channels
       const values = index >= 0 ? channels[Math.min(index, channels.length - 1)] : channels[0].map((_, square) => channels.reduce((sum, channel) => sum + Math.abs(channel[square]), 0) / channels.length)
       stage.values = values
+      if (!reduced.matches) stage.bars.scale.y = .2
       const maximum = Math.max(...values.map(Math.abs), .000001)
       values.forEach((value, square) => {
         const strength = Math.min(1, Math.abs(value) / maximum)
@@ -255,15 +376,15 @@ export function createBoardScene(host: HTMLDivElement, onSquare: (square: Square
   }
   function update(next: SceneSettings) {
     reconcile(next.state)
+    if ((next.exploded || next.paused || reduced.matches) && motionUntil && receivedState) hydrate(receivedState)
     const nextNetworkKey = next.inspection ? `${next.inspection.positionKey}:${next.inspection.checkpoint}` : ''
     if (networkKey !== nextNetworkKey) { buildNetwork(next.inspection); networkKey = nextNetworkKey }
     const changedChannels = settings?.channel !== next.channel || settings?.focus !== next.focus || settings?.inspection !== next.inspection
-    settings = next; updateMarkers(next)
-    const materials = new Set<THREE.Material>()
-    board.traverse(object => { if (object instanceof THREE.Mesh) (Array.isArray(object.material) ? object.material : [object.material]).forEach(material => materials.add(material)) })
-    boardMaterials = [...materials]
+    settings = next; updateMarkers({ ...next, state: displayedState ?? next.state })
+    controls.enabled = !next.paused
+    rememberMaterials()
     if (changedChannels) updateChannels()
-    const key = `${next.exploded}:${next.focus}:${next.orientation}:${next.resetCamera}:${networkKey}`
+    const key = `${next.exploded}:${next.focus}:${next.orientation}:${next.resetCamera}:${next.showcase}:${networkKey}`
     if (key !== cameraKey) { cameraKey = key; cameraDestination() }
   }
   function hit(event: PointerEvent) {
@@ -294,7 +415,9 @@ export function createBoardScene(host: HTMLDivElement, onSquare: (square: Square
     if (Math.hypot(event.clientX - down.x, event.clientY - down.y) > 5 && event.buttons) dragged = true
     if (dragged && event.buttons) return
     const found = hit(event)
-    renderer.domElement.style.cursor = found ? (settings?.exploded ? 'crosshair' : settings?.disabled ? 'grab' : 'pointer') : 'grab'
+    renderer.domElement.style.cursor = found ? (settings?.exploded ? 'crosshair' : settings?.disabled || motionBusy ? 'grab' : 'pointer') : 'grab'
+    hoverTile.visible = Boolean(found && 'square' in found && !('layerId' in found) && !settings?.exploded && !motionBusy && !settings?.disabled)
+    if (hoverTile.visible && found && 'square' in found) { hoverTile.position.copy(point(found.square)); hoverTile.position.y = .35 }
     if (found && 'layerId' in found) {
       const key = `${found.layerId}:${found.square}`
       if (key !== hoveredKey) { hoveredKey = key; onHover(found as InspectCell) }
@@ -304,10 +427,10 @@ export function createBoardScene(host: HTMLDivElement, onSquare: (square: Square
     if (dragged || event.button !== 0 || Math.hypot(event.clientX - down.x, event.clientY - down.y) > 5) return
     const found = hit(event)
     if (found && 'layerId' in found) { if (settings?.focus !== found.layerId) onFocus(found.layerId as string); else onHover(found as InspectCell) }
-    else if (found && !settings?.disabled) onSquare(found.square as SquareId)
+    else if (found && !settings?.disabled && !motionBusy) onSquare(found.square as SquareId)
   }
-  const leave = () => { hoveredKey = ''; onHover(null) }
-  const wheel = (event: WheelEvent) => { event.preventDefault(); transition = null; zoomVelocity += Math.max(-.22, Math.min(.22, event.deltaY * .0008)) }
+  const leave = () => { hoveredKey = ''; hoverTile.visible = false; onHover(null) }
+  const wheel = (event: WheelEvent) => { event.preventDefault(); event.stopImmediatePropagation(); transition = null; zoomVelocity += Math.max(-.22, Math.min(.22, event.deltaY * .0008)) }
   const orbitStart = () => { transition = null; zoomVelocity = 0 }
   const contextLost = (event: Event) => { event.preventDefault(); onFailure() }
   controls.addEventListener('start', orbitStart)
@@ -315,14 +438,22 @@ export function createBoardScene(host: HTMLDivElement, onSquare: (square: Square
   renderer.domElement.addEventListener('pointermove', pointerMove)
   renderer.domElement.addEventListener('pointerup', pointerUp)
   renderer.domElement.addEventListener('pointerleave', leave)
-  renderer.domElement.addEventListener('wheel', wheel, { passive: false })
+  renderer.domElement.addEventListener('wheel', wheel, { passive: false, capture: true })
   renderer.domElement.addEventListener('webglcontextlost', contextLost)
-  const visibility = () => { visible = !document.hidden; lastTime = 0; if (visible && !raf) raf = requestAnimationFrame(frame) }
+  const visibility = () => {
+    visible = !document.hidden; lastTime = 0
+    if (!visible && receivedState && motionUntil) hydrate(receivedState)
+    if (visible && !raf) raf = requestAnimationFrame(frame)
+  }
   document.addEventListener('visibilitychange', visibility)
   function frame(now: number) {
     raf = 0
     if (disposed || !visible) return
     const delta = Math.min(.05, lastTime ? (now - lastTime) / 1000 : 1 / 60); lastTime = now
+    if (settings?.paused) {
+      stages.forEach(stage => { stage.label.hidden = true })
+      raf = requestAnimationFrame(frame); return
+    }
     if (transition) {
       const t = reduced.matches ? 1 : Math.min(1, (now - transition.start) / 950)
       camera.position.lerpVectors(transition.from, transition.to, ease(t))
@@ -335,32 +466,67 @@ export function createBoardScene(host: HTMLDivElement, onSquare: (square: Square
       zoomVelocity *= Math.exp(-delta * 10)
     }
     controls.update()
+    if (reduced.matches && motionUntil && receivedState) hydrate(receivedState)
     for (let index = actors.length - 1; index >= 0; index--) {
-      const actor = actors[index], t = reduced.matches ? 1 : Math.min(1, (now - actor.started) / (actor.retiring ? 300 : 540))
+      const actor = actors[index], elapsed = now - actor.started
       if (actor.retiring) {
-        actor.mesh.scale.setScalar(Math.max(.001, 1 - ease(t)))
-        actor.mesh.position.y = actor.from.y - .22 * ease(t)
-        if (t === 1) { pieces.remove(actor.mesh); actors.splice(index, 1) }
+        const pose = defeatPose(actor.attackKind, elapsed, reduced.matches)
+        actor.mesh.scale.setScalar(Math.max(.001, pose.scale))
+        actor.mesh.position.copy(actor.from)
+        actor.mesh.position.x += Math.sin(actor.direction) * pose.displacement
+        actor.mesh.position.z += Math.cos(actor.direction) * pose.displacement
+        actor.mesh.position.y += pose.lift
+        actor.mesh.rotation.set(Math.cos(actor.direction) * pose.tilt, pose.spin, -Math.sin(actor.direction) * pose.tilt)
+        if (pose.progress === 1) { pieces.remove(actor.mesh); actors.splice(index, 1) }
+      } else if (actor.deploying) {
+        const t = Math.max(0, Math.min(1, elapsed / DEPLOY_MS)), amount = ease(t)
+        actor.mesh.position.copy(actor.to); actor.mesh.position.y += (1 - amount) * .48
+        actor.mesh.scale.setScalar(.82 + .18 * amount)
+        if (t === 1) actor.deploying = false
+      } else if (actor.moving) {
+        const pose = movePose(actor.attackKind, elapsed, actor.capture, reduced.matches)
+        actor.mesh.position.lerpVectors(actor.from, actor.to, pose.progress); actor.mesh.position.y += pose.lift
+        actor.mesh.rotation.set(Math.cos(actor.direction) * pose.pitch, pose.yaw, -Math.sin(actor.direction) * pose.pitch + pose.roll)
+        actor.mesh.scale.setScalar(pose.scale)
+        if (actor.promotion && elapsed >= (actor.capture ? IMPACT_MS : MOVE_MS * .9)) {
+          actor.mesh.clear()
+          pieceTemplate(actor.piece).children.forEach(child => actor.mesh.add(child.clone(true)))
+          actor.promotion = null; rememberMaterials()
+        }
+        if (elapsed >= (actor.capture ? CAPTURE_MS : MOVE_MS)) { actor.moving = false; actor.mesh.position.copy(actor.to); actor.mesh.rotation.set(0, 0, 0); actor.mesh.scale.setScalar(1) }
       } else {
-        actor.mesh.position.lerpVectors(actor.from, actor.to, ease(t)); actor.mesh.position.y += Math.sin(Math.PI * t) * actor.hop
+        const selected = !settings?.exploded && settings?.selectedSquare === actor.piece.square && !motionBusy
+        actor.mesh.position.y = reduced.matches ? actor.to.y : THREE.MathUtils.damp(actor.mesh.position.y, actor.to.y + (selected ? .085 : 0), 10, delta)
+        actor.mesh.rotation.y = selected && !reduced.matches ? Math.sin(now / 1100) * .025 : 0
+        actor.mesh.scale.setScalar(selected && !reduced.matches ? 1.015 + Math.sin(now / 750) * .004 : 1)
       }
     }
+    captures.update(now, reduced.matches)
+    if (motionUntil && now >= motionUntil) {
+      motionUntil = 0
+      const queued = pending.shift()
+      if (queued) beginMove(queued)
+      notifyMotion()
+    }
+    markers.children.forEach(marker => marker.scale.setScalar(marker.userData.pulse && !reduced.matches ? 1 + Math.sin(now / 400) * .035 : 1))
     const focused = settings?.exploded && settings.focus !== 'overview'
     const targetOpacity = focused ? .08 : 1
     boardOpacity = reduced.matches ? targetOpacity : THREE.MathUtils.damp(boardOpacity, targetOpacity, 7, delta)
-    boardMaterials.forEach(material => {
-      const transparent = boardOpacity < .995 || material === markerMaterial || material === lastMaterial || Boolean((material as THREE.MeshBasicMaterial).map)
+    boardMaterials.forEach((original, material) => {
+      const transparent = boardOpacity < .995 || original.transparent
       if (material.transparent !== transparent) { material.transparent = transparent; material.needsUpdate = true }
-      material.opacity = material === markerMaterial ? boardOpacity * .85 : material === lastMaterial ? boardOpacity * .3 : boardOpacity
-      material.depthWrite = boardOpacity > .9 && material !== markerMaterial && material !== lastMaterial
+      material.opacity = original.opacity * boardOpacity
+      material.depthWrite = boardOpacity > .9 && original.depthWrite
     })
-    board.visible = !focused || boardOpacity > .09; floor.visible = !settings?.exploded
+    board.visible = !focused || boardOpacity > .09; floor.visible = halo.visible = !settings?.exploded
+    captureRoot.visible = !settings?.exploded
     network.visible = Boolean(settings?.exploded && settings.inspection)
     connectors.clear()
     // Connector geometry is reused, not allocated in the animation loop.
     for (const stage of stages) {
       const targetY = settings?.exploded ? stage.target.y : -.65
       stage.group.position.y = reduced.matches ? targetY : THREE.MathUtils.damp(stage.group.position.y, targetY, 6, delta)
+      stage.bars.scale.y = reduced.matches ? 1 : THREE.MathUtils.damp(stage.bars.scale.y, 1, 9, delta)
       const selected = !focused || stage.layer.id === settings?.focus
       stage.group.visible = network.visible && selected
       if (selected && network.visible) {
@@ -401,6 +567,9 @@ export function createBoardScene(host: HTMLDivElement, onSquare: (square: Square
         renderer.domElement.dataset.observedFps = (measuredFrames * 1000 / Math.max(1, now - measuredSince)).toFixed(1)
         measuredFrames = 0; measuredSince = now
       }
+      renderer.domElement.dataset.motionBusy = String(motionBusy)
+      renderer.domElement.dataset.visualPly = String(displayedState?.moveHistory.length ?? 0)
+      renderer.domElement.dataset.cameraDistance = camera.position.distanceTo(controls.target).toFixed(2)
     }
     raf = requestAnimationFrame(frame)
   }
@@ -424,14 +593,17 @@ export function createBoardScene(host: HTMLDivElement, onSquare: (square: Square
       renderer.domElement.removeEventListener('pointermove', pointerMove)
       renderer.domElement.removeEventListener('pointerup', pointerUp)
       renderer.domElement.removeEventListener('pointerleave', leave)
-      renderer.domElement.removeEventListener('wheel', wheel)
+      renderer.domElement.removeEventListener('wheel', wheel, true)
       renderer.domElement.removeEventListener('webglcontextlost', contextLost)
       stages.forEach(stage => stage.label.remove())
       board.traverse(object => { if (object instanceof THREE.Mesh) (Array.isArray(object.material) ? object.material : [object.material]).forEach(material => { const map = (material as THREE.MeshBasicMaterial).map; map?.dispose() }) })
-      disposeGroup(scene, true); disposeGroup(resources, true)
-      ringGeometry.dispose(); dotGeometry.dispose(); lastGeometry.dispose(); markerMaterial.dispose(); lastMaterial.dispose()
+      captures.dispose(); scene.remove(captureRoot)
+      disposeGroup(scene, true)
+      ringGeometry.dispose(); dotGeometry.dispose(); lastGeometry.dispose(); markerMaterial.dispose(); lastMaterial.dispose(); checkMaterial.dispose(); hoverMaterial.dispose()
+      darkStone.dispose(); lightStone.dispose(); haloTexture.dispose()
       edges.forEach(line => line.geometry.dispose()); connectorMaterial.dispose(); key.shadow.dispose()
       environmentTarget.dispose(); renderer.dispose(); renderer.domElement.remove()
+      motionUntil = 0; pending = []; notifyMotion()
     },
   }
 }

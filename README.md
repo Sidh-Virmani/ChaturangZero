@@ -27,10 +27,17 @@ replace the team's modules with the prototype's backend.
 
 - Beveled board tiles, blush and midnight colours, champagne inlays, porcelain
   and onyx materials, restrained cyan illumination, environment lighting, shadows.
-- Original procedural Raja, Mantri, Ratha, Gaja, Ashva, and Padati sculptures.
-  Geometry is cached and merged by material to reduce draw calls.
-- Eased moves and capture retirement, damped orbiting and wheel zoom, smooth
-  camera flips, reset framing, and animated layer separation/focus.
+- Original procedural Raja, Mantri, Ratha, Gaja, Ashva, and Padati sculptures:
+  lotus crowns, turban ribs, chariot spokes, horse bridles, elephant ornaments,
+  and infantry shields and spears. Geometry is cached and merged by material.
+- Six distinct capture sequences: Ashva crescent leap, Gaja lotus shockwave,
+  Ratha chariot charge, Mantri astral sigil, Raja royal eclipse, and Padati spear
+  strike. Approach, impact, victim retirement and landing share an elapsed-time
+  clock; particles are deterministic, decorative and pooled.
+- A replayable piece gallery with movement rules and clearly labelled illustrative
+  positions. It never changes the current match or calls the game API.
+- Staggered piece arrivals, selection lift, check rings, mineral veining, gold
+  frame rails, damped orbiting/zoom, camera flips and animated network focus.
 - A real model inspector: input planes, stem, every configured residual block,
   policy features, legally masked policy, value features, and the scalar value.
 - Individual channel selection, numeric canvas hover/tap readings, a keyboard
@@ -46,6 +53,11 @@ Moves still come from the existing game API. The scene reconciles pieces by
 their squares and the last move because `main` assigns position-based piece IDs.
 No alternative rules engine, action numbering, trainer, or checkpoint format
 is introduced.
+
+Fast AI replies queue behind the preceding visual move. Input unlocks after
+the sequence settles, and terminal result dialogs wait for the final capture.
+Reset, inspection, 2D switching and reduced-motion mode settle safely. Motion
+does not affect engine legality, rewards, model predictions or search results.
 
 ## Run locally
 
@@ -136,6 +148,7 @@ performance depends on the browser and GPU; the 2D fallback remains available.
 .\.venv\Scripts\python.exe -m pytest -q
 cd shared/ui
 npm run build
+npm test
 ```
 
 `pytest.ini` limits discovery to the actual `tests/` directory, excluding local
@@ -144,6 +157,11 @@ ordinary P2 inference, check dynamic block counts and exact P1 planes, preserve
 batch-normalization state, reject stale/busy inspection, and verify terminal
 masking and the HTTP endpoint. Browser verification covers the interactive views,
 camera controls, channel selection, and responsive layouts.
+The frontend tests check every character's timing/endpoints, history continuity,
+bounded effect pools, finite transforms, reduced motion and resource disposal.
+Use Node 24 for the native TypeScript test runner. While Vite runs, open
+`http://127.0.0.1:5173/tests/scene-harness.html` and run the scene lifecycle
+checks; repeat with the browser's reduced-motion emulation enabled.
 
 ## Presentation and next steps
 
@@ -152,6 +170,8 @@ Credit the team's existing core and P1–P4 modules; your contribution in this
 branch is the main-compatible 3D experience and educational inspection boundary.
 Show a legal move, a machine search, the 13 input planes, a residual channel,
 the two heads, and the difference between a network prior and a search visit.
+Use the piece gallery to demonstrate the six capture styles without needing
+to reach every capture in a live match.
 Call the demonstration checkpoint a smoke model, without claiming measured strength.
 
 The main remaining work is model quality: run longer self-play training,

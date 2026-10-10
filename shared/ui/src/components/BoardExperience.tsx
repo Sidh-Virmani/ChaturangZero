@@ -1,10 +1,11 @@
 import { Component, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Board } from './Board'
 import { gameAdapter } from '../services/httpGameAdapter'
-import type { BoardState, LegalMove, Side, SquareId } from '../types/game'
+import type { BoardState, LegalMove, Move, Side, SquareId } from '../types/game'
 import type { InspectCell, NeuralInspection } from '../types/neural'
 
 const Board3D = lazy(() => import('./Board3D'))
+const PieceGallery = lazy(() => import('./PieceGallery'))
 class SceneBoundary extends Component<{ onFailure: () => void; children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
   static getDerivedStateFromError() { return { failed: true } }
@@ -20,6 +21,7 @@ interface Props {
   busy: boolean
   thinking: boolean
   onSquareClick: (square: SquareId) => void
+  onMotionChange: (busy: boolean) => void
 }
 
 const format = (value: number) => Math.abs(value) > 0 && Math.abs(value) < .0001 ? value.toExponential(3) : value.toFixed(4)
@@ -37,8 +39,15 @@ export function BoardExperience(props: Props) {
   const [error, setError] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [refresh, setRefresh] = useState(0)
+  const [animating, setAnimating] = useState(false)
+  const [visualMove, setVisualMove] = useState<Move | null>(null)
+  const [gallery, setGallery] = useState(false)
   const request = useRef(0)
   const positionKey = props.state.positionKey
+  useEffect(() => {
+    if (view === '2d' || failed) { setAnimating(false); props.onMotionChange(false) }
+  }, [view, failed, positionKey, props.onMotionChange])
+  const motionChanged = (busy: boolean, move?: Move | null) => { setAnimating(busy); setVisualMove(move ?? null); props.onMotionChange(busy) }
   useEffect(() => {
     const epoch = ++request.current
     const controller = new AbortController()
@@ -75,6 +84,7 @@ export function BoardExperience(props: Props) {
         <button type="button" aria-pressed={view === '2d'} onClick={() => { setView('2d'); setExploded(false) }}>2D board</button>
       </div>
       <div className="experience-actions">
+        <button type="button" disabled={failed} className="collection-toggle" aria-haspopup="dialog" onClick={() => setGallery(true)}><span aria-hidden="true">♘</span> Piece collection</button>
         <button type="button" className="network-toggle" disabled={failed} aria-pressed={exploded} onClick={toggleNetwork}><span aria-hidden="true">◇</span> {exploded ? 'Return to game' : 'Explore the network'}</button>
         {view === '3d' && <button type="button" className="camera-reset" aria-label="Reset camera" title="Reset camera" onClick={() => setResetCamera(value => value + 1)}>↺</button>}
       </div>
@@ -82,10 +92,11 @@ export function BoardExperience(props: Props) {
     {failed && <p className="experience-notice" role="status">3D graphics are unavailable in this browser. You can play every move on the 2D board.</p>}
     {view === '2d' ? <Board {...props} busyLabel="Syncing with engine…" /> : <div className="three-stage-wrap">
       <SceneBoundary onFailure={fallback}><Suspense fallback={<div className="three-loading" role="status"><span className="spinner" />Preparing the atelier…</div>}>
-        <Board3D {...props} inspection={currentInspection} exploded={exploded} focus={focus} channel={selectedChannel} replay={replay} resetCamera={resetCamera} onHover={setHover} onFocus={goToLayer} onFailure={fallback} />
+        <Board3D {...props} paused={gallery} inspection={currentInspection} exploded={exploded} focus={focus} channel={selectedChannel} replay={replay} resetCamera={resetCamera} onHover={setHover} onFocus={goToLayer} onFailure={fallback} onMotionChange={motionChanged} />
       </Suspense></SceneBoundary>
       <div className="stage-caption" aria-hidden="true"><span>{exploded ? 'INSIDE THE NETWORK' : 'THE ROYAL ATELIER'}</span><small>{exploded ? 'One position · real tensors' : 'Ivory porcelain · onyx · champagne gold'}</small></div>
       {!exploded && <p className="stage-help">Drag to orbit <i /> Scroll to zoom <i /> Click a piece to play</p>}
+      {!exploded && animating && visualMove?.captured && <div className="capture-caption" role="status"><span className="capture-caption__icon" aria-hidden="true">✦</span><span><strong>{({ ashva: 'Crescent leap', gaja: 'Lotus shockwave', ratha: 'Chariot charge', mantri: 'Astral sigil', raja: 'Royal eclipse', padati: 'Spear strike' })[visualMove.piece]}</strong><small>{visualMove.from} → {visualMove.to} · {visualMove.piece} takes {visualMove.captured}</small></span></div>}
       {exploded && currentInspection && <div className="canvas-layer-controls">
         <label>Focus layer<select aria-label="Focus network layer" value={focus} onChange={event => goToLayer(event.target.value)}><option value="overview">All layers · exploded view</option>{currentInspection.layers.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
         {layer && layer.channels.length > 1 && <label>Channel<select aria-label="3D feature channel" value={selectedChannel} onChange={event => { setChannel(Number(event.target.value)); setHover(null) }}><option value={-1}>Mean absolute activation</option>{layer.channels.map((_, index) => <option key={index} value={index}>{layer.channelNames?.[index]?.replaceAll('_', ' ') ?? `Channel ${index + 1}`}</option>)}</select></label>}
@@ -127,5 +138,6 @@ export function BoardExperience(props: Props) {
         {currentInspection.value !== null && <div className="prediction-summary"><div><span className="eyebrow">VALUE · {currentInspection.sideToMove.toUpperCase()} TO MOVE</span><strong>{currentInspection.value.toFixed(3)}</strong><p>A learned outcome estimate in [−1, +1], not a win probability. Its quality depends on training.</p></div><div><span className="eyebrow">HIGHEST LEGAL PRIORS</span>{topPolicy.map(action => <div className="prior-row" key={action.actionId}><span>{action.from} → {action.to}</span><meter min={0} max={1} value={action.prior} aria-label={`${action.from} to ${action.to} prior`} /><strong>{(action.prior * 100).toFixed(1)}%</strong></div>)}{topPolicy.length === 0 && <p>No legal actions in this terminal position.</p>}<p>MCTS search results remain available in the game sidebar.</p></div></div>}
       </> : !loading && !props.thinking && !error && <p className="experience-notice">Open the inspector to read the current position.</p>}
     </section>}
+    {gallery && <Suspense fallback={<div className="experience-notice" role="status">Preparing the royal collection…</div>}><PieceGallery onClose={() => setGallery(false)} /></Suspense>}
   </div>
 }

@@ -54,6 +54,9 @@ branch using the team's normal workflow, resolve changes to App/API adapters,
 then run `python -m pytest -q` and `npm run build` in `shared/ui`. Test both game
 modes, selection/capture, reset during search, flip, 2D fallback, checkpoint-free
 encoding, and a real checkpoint with its configured layer count.
+Also run `npm test` with Node 24 and the developer scene harness at
+`/tests/scene-harness.html` under Vite. Check fast replies, promotion captures,
+reset during captures, inspection switching, disposal and reduced-motion unlocks.
 
 Keep local checkpoint binaries, node_modules, dist, and verification/runtime
 artifacts out of the commit. A smoke checkpoint is adequate for a pipeline demo,
@@ -68,6 +71,29 @@ Camera/layer movement uses elapsed time, and hidden tabs suspend their render lo
 Scene teardown releases geometry, textures, environment maps, shadows, controls,
 listeners, observers, labels, and the renderer. Development-only canvas attributes
 report observed frames, draw calls and triangles for local QA; no telemetry is sent.
+
+## Capture choreography and gallery
+
+`three/motion.ts` defines pure poses. Ordinary moves last 680 ms; captures contact
+at 620 ms and settle at 1,450 ms. Each character has its own approach and impact
+motif. A victim remains intact until contact; its shared sculpture is retired by
+transform rather than fading the shared materials. Promotion replaces the moving
+Padati sculpture with Mantri at contact/arrival and keeps Padati's attack motif.
+
+`three/captureEffects.ts` owns a four-slot GPU effect pool with shared geometry,
+per-slot materials, deterministic sparks, rings, petals, rays and trails. It sits
+outside the board's material fade traversal so inspector transitions do not
+overwrite effect alpha. Effects never intercept rays or mutate the game.
+
+The scene distinguishes received and displayed snapshots. Contiguous histories
+queue; resets, history jumps, inspection and hidden tabs settle to the latest
+snapshot and clear effects. Motion callbacks tell React when to unlock input and
+which visual capture to caption. Every non-animated snapshot explicitly releases
+the reserved input lock, including reduced-motion positions.
+
+The gallery uses local, labelled demonstration fixtures and the same renderer.
+It does not reset the server, fabricate AI activations, or modify the active game.
+The rules engine remains responsible for every actual match move.
 
 The UI retains a clear distinction between measured activations and illustrative
 animation. It visualizes selected/aggregated channel maps, not every internal

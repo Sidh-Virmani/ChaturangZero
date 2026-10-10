@@ -19,6 +19,8 @@ body { background: radial-gradient(ellipse at 55% -20%, #343045, #141823 64%); }
 .board-section { min-width: 0; }
 .board-experience { width: 100%; min-width: 0; }
 .experience-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0 14px; }
+.experience-actions { flex-wrap: wrap; justify-content: flex-end; }
+.collection-toggle span { font-size: 15px; color: #dec08d; margin-right: 3px; }
 .view-switch, .experience-actions { display: flex; align-items: center; gap: 5px; }
 .view-switch { padding: 3px; border: 1px solid #354054; border-radius: 9px; background: #151b28; }
 .experience-toolbar button, .educational-inspector button { cursor: pointer; border: 1px solid transparent; background: transparent; color: #aab6c8; border-radius: 6px; padding: 8px 12px; font-size: 11px; font-weight: 600; transition: background .18s, color .18s, border-color .18s; }
@@ -37,6 +39,11 @@ body { background: radial-gradient(ellipse at 55% -20%, #343045, #141823 64%); }
 .stage-caption small { color: #808c9f; font-size: 10px; }
 .stage-help { position: absolute; bottom: 13px; left: 0; right: 0; text-align: center; font-size: 10px; color: #9aa6bb; pointer-events: none; }
 .stage-help i { display: inline-block; width: 3px; height: 3px; background: #a79579; margin: 2px 8px; border-radius: 50%; }
+.capture-caption { position: absolute; left: 50%; bottom: 48px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 12px 20px; border: 1px solid #c6a77966; border-radius: 12px; background: #142330de; backdrop-filter: blur(14px); box-shadow: 0 10px 36px #0004; pointer-events: none; animation: capture-caption-in .3s ease-out; white-space: nowrap; }
+.capture-caption__icon { font-size: 24px; color: #edc88f; }
+.capture-caption strong { display: block; font-family: 'DM Serif Display', Georgia, serif; font-size: 18px; font-weight: 400; color: #f0debe; }
+.capture-caption small { display: block; margin-top: 3px; font-size: 10px; color: #9fb9be; }
+@keyframes capture-caption-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .stage-status { position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid #445266; border-radius: 8px; color: #cbd8de; font-size: 11px; background: #1e2938ee; }
 .stage-status .spinner { width: 12px; height: 12px; }
 .three-loading { height: 540px; display: flex; align-items: center; justify-content: center; gap: 12px; color: #b9c4d4; }
@@ -101,3 +108,4 @@ body { background: radial-gradient(ellipse at 55% -20%, #343045, #141823 64%); }
 }
 @media (min-width: 1080px) { .three-stage { height: clamp(480px, calc(100vh - 350px), 680px); } }
 @media (prefers-reduced-motion: reduce) { .experience-toolbar button, .educational-inspector button { transition: none; }.spinner { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .capture-caption { animation: none; } }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { createBoardScene, type SceneSettings } from '../three/scene'
-import type { SquareId } from '../types/game'
+import type { Move, SquareId } from '../types/game'
 import type { InspectCell } from '../types/neural'
 
 interface Props extends SceneSettings {
@@ -8,6 +8,7 @@ interface Props extends SceneSettings {
   onHover: (cell: InspectCell | null) => void
   onFocus: (id: string) => void
   onFailure: () => void
+  onMotionChange: (busy: boolean, move?: Move | null) => void
 }
 
 export default function Board3D(props: Props) {
@@ -16,7 +17,7 @@ export default function Board3D(props: Props) {
   const current = useRef(props); current.current = props
   useEffect(() => {
     try {
-      scene.current = createBoardScene(host.current!, square => current.current.onSquareClick(square), cell => current.current.onHover(cell), id => current.current.onFocus(id), () => current.current.onFailure())
+      scene.current = createBoardScene(host.current!, square => current.current.onSquareClick(square), cell => current.current.onHover(cell), id => current.current.onFocus(id), () => current.current.onFailure(), (busy, move) => current.current.onMotionChange(busy, move))
       scene.current.update(current.current)
     } catch {
       current.current.onFailure()

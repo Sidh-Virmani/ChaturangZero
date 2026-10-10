@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChaturangZero · Scene lifecycle checks</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; color: #ece7dd; background: #10151d; font: 15px/1.5 system-ui, sans-serif; }
+      main { max-width: 1200px; margin: 0 auto; padding: 28px; }
+      .eyebrow { color: #91d7ca; font-size: 11px; font-weight: 700; letter-spacing: .18em; }
+      h1 { margin: 8px 0; font-size: clamp(25px, 4vw, 35px); font-weight: 550; }
+      p { color: #b6b9bf; max-width: 850px; }
+      .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin: 22px 0; }
+      button { border: 1px solid #c3a873; border-radius: 9px; padding: 12px 18px; background: #d8bc86; color: #171b20; font: inherit; font-weight: 650; cursor: pointer; }
+      button:disabled { opacity: .55; cursor: wait; }
+      #mode, #summary { font-size: 13px; color: #c7c1b6; }
+      .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; }
+      #stage { position: relative; height: 480px; overflow: hidden; border: 1px solid #343d49; border-radius: 15px; background: #151823; }
+      #stage::before { content: 'LOCAL FIXTURE BOARD · NO GAME ENGINE OR API'; position: absolute; top: 14px; left: 17px; z-index: 1; color: #b5b6b8; font-size: 9px; letter-spacing: .15em; pointer-events: none; }
+      #stage canvas { display: block; width: 100%; height: 100%; }
+      .panel { border: 1px solid #343d49; border-radius: 15px; background: #181f2a; padding: 19px; }
+      h2 { margin: 0 0 12px; font-size: 17px; }
+      ol { list-style: none; margin: 0; padding: 0; }
+      li { padding: 12px 0; border-bottom: 1px solid #ffffff12; }
+      li:last-child { border-bottom: 0; }
+      li strong { display: block; font-size: 13px; }
+      li small { display: block; margin-top: 4px; color: #aeb5c1; line-height: 1.4; }
+      li[data-result="pass"] strong { color: #91d7ca; }
+      li[data-result="fail"] strong { color: #ffb0a4; }
+      li[data-result="running"] strong { color: #e7c989; }
+      #summary { min-height: 22px; }
+      footer { color: #828c9b; margin-top: 18px; font-size: 12px; }
+      @media (max-width: 850px) { main { padding: 18px; } .layout { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <span class="eyebrow">DEVELOPER VERIFICATION · THREE.JS</span>
+      <h1>Scene lifecycle checks</h1>
+      <p>This page drives the real 3D scene with small, explicit local fixtures. It checks animation callbacks, rapid snapshot queues, resets, inspector transitions, promotion, and cleanup. It does not validate game rules or contact the Python engine.</p>
+      <div class="toolbar">
+        <button id="run" type="button">Run lifecycle checks</button>
+        <span id="mode"></span>
+      </div>
+      <p id="summary" role="status" aria-live="polite">Ready. Keep this page visible while checks run; a normal run takes about 9 seconds.</p>
+      <div class="layout">
+        <div id="stage" aria-label="Fixture board used for scene lifecycle tests"></div>
+        <section class="panel" aria-label="Lifecycle check results">
+          <h2>Verification results</h2>
+          <ol id="results" aria-live="polite"></ol>
+        </section>
+      </div>
+      <footer>Run once with normal motion, then emulate <code>prefers-reduced-motion: reduce</code>, reload, and run again. Fixtures are intentionally separate from a real game session.</footer>
+    </main>
+    <script type="module" src="./scene-harness.ts"></script>
+  </body>
+</html>

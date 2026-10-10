@@ -16,6 +16,7 @@ function App() {
   const [legalMoves, setLegalMoves] = useState<LegalMove[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isAiThinking, setIsAiThinking] = useState(false)
+  const [isAnimating, setIsAnimating] = useState(false)
   const [machineProgress, setMachineProgress] = useState<MachineProgress | null>(null)
   const [machineResult, setMachineResult] = useState<MachineAnalysis | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -33,6 +34,7 @@ function App() {
     setOrientation('white')
     setIsLoading(true)
     setIsAiThinking(false)
+    setIsAnimating(false)
     setMachineProgress(null)
     setMachineResult(null)
     setError(null)
@@ -40,7 +42,7 @@ function App() {
     clearSelection()
     try {
       const next = await gameAdapter.resetGame(nextMode)
-      if (epoch === requestEpoch.current) setState(next)
+      if (epoch === requestEpoch.current) { setIsAnimating(true); setState(next) }
     } catch (cause) {
       if (epoch === requestEpoch.current) setError(cause instanceof Error ? cause.message : 'Unable to start the game.')
     } finally {
@@ -54,6 +56,7 @@ function App() {
     setError(null)
     setIsLoading(false)
     setIsAiThinking(false)
+    setIsAnimating(false)
     setMachineProgress(null)
     setMachineResult(null)
     setScreen('home')
@@ -63,13 +66,14 @@ function App() {
     const epoch = ++requestEpoch.current
     setIsLoading(true)
     setIsAiThinking(false)
+    setIsAnimating(false)
     setMachineProgress(null)
     setMachineResult(null)
     setError(null)
     clearSelection()
     try {
       const next = await gameAdapter.resetGame(mode)
-      if (epoch === requestEpoch.current) setState(next)
+      if (epoch === requestEpoch.current) { setIsAnimating(true); setState(next) }
     } catch (cause) {
       if (epoch === requestEpoch.current) setError(cause instanceof Error ? cause.message : 'Unable to reset the game.')
     } finally {
@@ -105,6 +109,7 @@ function App() {
         await new Promise((resolve) => window.setTimeout(resolve, 320))
         if (epoch === requestEpoch.current) {
           setState(next)
+          setIsAnimating(true)
           setMachineResult(null)
         }
       }
@@ -140,7 +145,7 @@ function App() {
   }
 
   const handleSquareClick = async (square: SquareId) => {
-    if (!state || isLoading || isAiThinking || state.status.code === 'terminal' ||
+    if (!state || isLoading || isAiThinking || isAnimating || state.status.code === 'terminal' ||
       (mode === 'machine' && (!state.machineReady || state.currentTurn !== 'white'))) return
     if (square === selectedSquare) {
       clearSelection()
@@ -155,6 +160,7 @@ function App() {
         const next = await gameAdapter.requestMove({ from: selectedSquare, to: square })
         if (epoch !== requestEpoch.current) return
         setState(next)
+        setIsAnimating(true)
         clearSelection()
         setIsLoading(false)
         if (mode === 'machine' && next.status.code !== 'terminal') {
@@ -204,11 +210,11 @@ function App() {
               <div className={`game-layout game-layout--${mode}`}>
                 <section className="board-section" aria-label="Game board">
                   <PlayerStrip side={topSide} currentTurn={state.currentTurn} mode={mode} />
-                  <BoardExperience state={state} orientation={orientation} selectedSquare={selectedSquare} legalMoves={legalMoves} disabled={isLoading || isAiThinking || state.status.code === 'terminal' || (mode === 'machine' && (!state.machineReady || state.currentTurn !== 'white'))} busy={isLoading} thinking={isAiThinking} onSquareClick={(square) => void handleSquareClick(square)} />
+                  <BoardExperience state={state} orientation={orientation} selectedSquare={selectedSquare} legalMoves={legalMoves} disabled={isLoading || isAiThinking || isAnimating || state.status.code === 'terminal' || (mode === 'machine' && (!state.machineReady || state.currentTurn !== 'white'))} busy={isLoading} thinking={isAiThinking} onMotionChange={setIsAnimating} onSquareClick={(square) => void handleSquareClick(square)} />
                   <PlayerStrip side={orientation} currentTurn={state.currentTurn} mode={mode} />
                 </section>
                 <GameSidebar state={state} mode={mode} orientation={orientation} thinking={isAiThinking} progress={machineProgress} machineResult={machineResult} disabled={isLoading || isAiThinking} onReset={() => void resetGame()} onFlip={flipBoard} />
-                {state.status.code === 'terminal' && <ResultModal status={state.status} onRematch={() => void resetGame()} onHome={goHome} />}
+                {state.status.code === 'terminal' && !isLoading && !isAnimating && <ResultModal status={state.status} onRematch={() => void resetGame()} onHome={goHome} />}
               </div>
             ) : <div className="initial-loading" role="status"><span className="spinner" /><strong>Preparing the board</strong><p>Connecting to the Chaturanga game core...</p></div>}
           </>
