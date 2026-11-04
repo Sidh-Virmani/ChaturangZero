@@ -110,7 +110,12 @@ class MCTS:
         self.root = child
 
     def _evaluate_and_expand(self, node: MCTSNode) -> float:
-        evaluation = self.evaluator.evaluate(node.state)
+        evaluate_known = getattr(self.evaluator, "evaluate_with_legal_moves", None)
+        evaluation = (
+            evaluate_known(node.state, node.legal_moves)
+            if callable(evaluate_known)
+            else self.evaluator.evaluate(node.state)
+        )
         policy = np.asarray(evaluation.policy)
         if policy.shape != (ACTION_SPACE_SIZE,):
             raise ValueError(

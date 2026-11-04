@@ -228,3 +228,9 @@ Use this format:
 **Changed:** MCTS stores lightweight legal edges and creates child states only when selected. Core-owned trusted transitions avoid revalidating known legal moves; each node shares one legal-move calculation with its terminal check.
 **Why:** Avoids constructing and validating branches that search never visits while preserving PUCT and public move validation.
 **Result:** Same checkpoint/workload: 25-simulation search **3.965 → 0.247 s** (16.1×), throughput **6.31 → 101.34 simulations/s**, short self-play **1.83 → 19.09 plies/s**. Unchanged raw NN and core operations measured slower in this run (legal moves **1.595 → 2.706 ms**, evaluator **2.394 → 5.108 ms**); results are recorded without attributing those differences to this optimization.
+
+## 2026-11-05 — Reused legal moves during MCTS evaluation (Phase 1B)
+
+**Changed:** MCTS passes its core-generated legal moves to an explicit trusted evaluator method; ordinary single and batch evaluation keep generating their own masks.
+**Why:** Each evaluated search state previously generated legal moves twice.
+**Result:** Profiled legal generations fell **52 → 26** per 25-simulation search. Same benchmark/checkpoint: search **0.247 → 0.137 s**, throughput **101.34 → 182.06 simulations/s**, short self-play **19.09 → 26.79 plies/s**. Ordinary evaluator batch 1 stayed **5.108 → 5.100 ms/state**. All **106 tests passed**; candidate-state construction/validation inside legal generation remains the largest profile cost.

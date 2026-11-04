@@ -8,8 +8,8 @@ from typing import Sequence
 import numpy as np
 import torch
 
-from p1_representation import ACTION_SPACE_SIZE, encode_state, legal_action_mask
-from shared.game_core import GameState
+from p1_representation import ACTION_SPACE_SIZE, encode_state, legal_action_mask, move_to_action
+from shared.game_core import GameState, Move
 
 from .model import PolicyValueNetwork
 
@@ -36,6 +36,26 @@ class NetworkEvaluator:
 
     def evaluate_batch(self, states: Sequence[GameState]) -> tuple[Evaluation, ...]:
         """Evaluate states together; results remain in the supplied order."""
+        return self._evaluate_batch(states)
+
+    def evaluate_with_legal_moves(
+        self, state: GameState, moves: Sequence[Move]
+    ) -> Evaluation:
+        """Reuse core-generated legal moves for this exact state.
+
+        Trusted optimization: the caller must supply the complete legal move
+        list from the same immutable state. This method translates moves with
+        P1; it deliberately does not recheck legality. Ordinary callers should
+        use evaluate(state). An empty list produces an all-zero policy.
+        """
+        mask = np.zeros((1, ACTION_SPACE_SIZE), dtype=bool)
+        for move in moves:
+            mask[0, move_to_action(move)] = True
+        return self._evaluate_batch((state,), mask)[0]
+
+    def _evaluate_batch(
+        self, states: Sequence[GameState], masks_np: np.ndarray | None = None
+    ) -> tuple[Evaluation, ...]:
         if not states:
             return ()
         if any(not isinstance(state, GameState) for state in states):
@@ -48,7 +68,7 @@ class NetworkEvaluator:
         try:
             with torch.inference_mode():
                 logits, values = self.model(inputs)
-                policies = self._legal_probabilities(logits, states)
+                policies = self._legal_probabilities(logits, states, masks_np)
         finally:
             self.model.train(was_training)
 
@@ -60,9 +80,11 @@ class NetworkEvaluator:
         )
 
     def _legal_probabilities(
-        self, logits: torch.Tensor, states: Sequence[GameState]
+        self, logits: torch.Tensor, states: Sequence[GameState],
+        masks_np: np.ndarray | None = None,
     ) -> torch.Tensor:
-        masks_np = np.stack([legal_action_mask(state) for state in states]).astype(bool)
+        if masks_np is None:
+            masks_np = np.stack([legal_action_mask(state) for state in states]).astype(bool)
         masks = torch.from_numpy(masks_np).to(self.device)
         policies = torch.zeros_like(logits)
         nonterminal = masks.any(dim=1)
