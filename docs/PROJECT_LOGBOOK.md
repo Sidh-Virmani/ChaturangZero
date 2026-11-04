@@ -222,3 +222,9 @@ Use this format:
 **Result:** Legal moves averaged **1.60 ms/state**; raw network inference was **0.77 ms/state** at batch 1 and **0.098 ms/state** at batch 64; a 25-simulation MCTS search took **3.97 s** at **6.31 simulations/s**; CPU training reached **37.67 steps/s** for batch 64.
 
 **Conclusion:** State encoding is negligible at **0.0049 ms/state**. Search/game-rule overhead is much larger than raw neural-network inference and remains the first optimization target.
+
+## 2026-11-05 — MCTS expansion optimization (Phase 1A)
+
+**Changed:** MCTS stores lightweight legal edges and creates child states only when selected. Core-owned trusted transitions avoid revalidating known legal moves; each node shares one legal-move calculation with its terminal check.
+**Why:** Avoids constructing and validating branches that search never visits while preserving PUCT and public move validation.
+**Result:** Same checkpoint/workload: 25-simulation search **3.965 → 0.247 s** (16.1×), throughput **6.31 → 101.34 simulations/s**, short self-play **1.83 → 19.09 plies/s**. Unchanged raw NN and core operations measured slower in this run (legal moves **1.595 → 2.706 ms**, evaluator **2.394 → 5.108 ms**); results are recorded without attributing those differences to this optimization.

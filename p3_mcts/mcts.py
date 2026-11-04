@@ -9,7 +9,7 @@ import numpy as np
 
 from p1_representation import ACTION_SPACE_SIZE, action_to_move, move_to_action
 from p2_neural_network import NetworkEvaluator
-from shared.game_core import GameState, Move, apply_move, legal_moves
+from shared.game_core import GameState, Move, apply_move
 
 from .config import MCTSConfig
 from .node import MCTSNode
@@ -104,6 +104,8 @@ class MCTS:
                 state=apply_move(self.root.state, move),
                 action_taken=action_id,
             )
+        else:
+            child = self.root.materialize_child(action_id)
         child.parent = None
         self.root = child
 
@@ -117,7 +119,7 @@ class MCTS:
         value = float(evaluation.value)
         if not np.isfinite(value) or not -1.0 <= value <= 1.0:
             raise ValueError("Evaluator value must be finite and in [-1, 1]")
-        moves = legal_moves(node.state)
+        moves = node.legal_moves
         actions = tuple((move_to_action(move), move) for move in moves)
         node.expand(actions, policy)
         return value

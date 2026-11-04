@@ -402,17 +402,31 @@ def _bare_king_winner(state: GameState) -> Optional[Side]:
     return None
 
 
-def terminal_status(state: GameState) -> Outcome:
+def _apply_known_legal_move(state: GameState, move: Move) -> GameState:
+    """Internal search transition: move MUST come from legal_moves(state).
+
+    No legality or terminal recheck is performed. External callers must use
+    apply_move. The existing core transition still owns capture and promotion.
+    """
+    return _move_without_validation(state, move)
+
+
+def _analyze_for_search(state: GameState) -> tuple[tuple[Move, ...], Outcome]:
+    """Compute legal moves and terminal knowledge together for one immutable state."""
     bare_king_winner = _bare_king_winner(state)
     if bare_king_winner is not None:
-        return Outcome(bare_king_winner, TerminalReason.BARE_KING)
+        return (), Outcome(bare_king_winner, TerminalReason.BARE_KING)
 
     moves = _legal_moves_unchecked(state)
     if moves:
-        return Outcome()
+        return moves, Outcome()
     if is_in_check(state):
-        return Outcome(state.side_to_move.opponent, TerminalReason.CHECKMATE)
-    return Outcome(state.side_to_move.opponent, TerminalReason.STALEMATE)
+        return moves, Outcome(state.side_to_move.opponent, TerminalReason.CHECKMATE)
+    return moves, Outcome(state.side_to_move.opponent, TerminalReason.STALEMATE)
+
+
+def terminal_status(state: GameState) -> Outcome:
+    return _analyze_for_search(state)[1]
 
 
 def legal_moves(state: GameState) -> tuple[Move, ...]:
