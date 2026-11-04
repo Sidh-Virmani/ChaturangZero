@@ -212,3 +212,13 @@ Use this format:
 **Result:** 25-simulation search improved from 4.10 s → 1.35 s.
 
 -->
+
+## 2026-11-05 — Baseline Performance Benchmark
+
+**Changed:** Added a reproducible benchmark using fixed initial, midgame and endgame positions plus the existing `hard.pt` checkpoint.
+
+**Why:** Future search and training optimizations now have one stable workload and machine-readable baseline for before/after comparison.
+
+**Result:** Legal moves averaged **1.60 ms/state**; raw network inference was **0.77 ms/state** at batch 1 and **0.098 ms/state** at batch 64; a 25-simulation MCTS search took **3.97 s** at **6.31 simulations/s**; CPU training reached **37.67 steps/s** for batch 64.
+
+**Conclusion:** State encoding is negligible at **0.0049 ms/state**. Search/game-rule overhead is much larger than raw neural-network inference and remains the first optimization target.
