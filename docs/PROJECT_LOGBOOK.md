@@ -241,3 +241,9 @@ Use this format:
 **Why:** Cyclic games previously reached the training cap and lost all their examples. Draws now finish normally with value 0, and arena/server/training metrics distinguish them from wins and truncations.
 **Result:** A fixed knight cycle now draws at ply 8 and retains 8 zero-value examples; a cap at ply 7 still truncates. Standard benchmark: 25-simulation search **0.137 → 0.164 s**, **182.06 → 152.54 simulations/s**, short self-play **26.79 → 20.06 plies/s**. Raw NN also slowed **1.233 → 1.736 ms/state**, so the measured regression cannot all be attributed to history tracking.
 **Tests:** 116 passed; existing win rules, promotion, lazy search, server reset, draw targets and replay/resume remain covered.
+
+## 2026-11-11 — Training symmetry augmentation (Phase 3)
+
+**Changed:** Each sampled example can use its 180° rotated, colour-swapped board and matching move targets (50% by default). The value stays the same and replay stores only the original.
+**Why:** The network can learn from both versions of a position without playing extra games. The saved sampling RNG makes the choice reproducible on resume.
+**Result:** Forced-augmentation smoke training and resume each completed one game and one finite update. The frozen `hard.pt` still shows mean value gap 0.473 and policy L1 gap 0.766 across three symmetric position pairs; this is a baseline, not a strength result.

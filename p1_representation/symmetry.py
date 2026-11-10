@@ -1,11 +1,31 @@
 """The board's valid 180-degree, color-swapping training symmetry."""
 
+import numpy as np
+
 from shared.game_core import BOARD_SIZE, GameState, Move, Piece
+
+from .state import STATE_SHAPE
 
 from .actions import action_to_move, move_to_action
 
 
 _LAST_SQUARE = BOARD_SIZE * BOARD_SIZE - 1
+
+
+def rotate_encoded_state(encoded: np.ndarray) -> np.ndarray:
+    """Rotate P1 planes and swap colours; return an independent same-dtype array.
+
+    Equivalent to encode_state(rotate_state(state)). Encoded states do not
+    contain history; use rotate_state for full GameState transformations.
+    """
+    if encoded.shape != STATE_SHAPE:
+        raise ValueError(f"Expected encoded state shape {STATE_SHAPE}")
+    rotated = np.empty_like(encoded)
+    piece_planes_per_side = (STATE_SHAPE[0] - 1) // 2
+    rotated[:piece_planes_per_side] = encoded[piece_planes_per_side:-1, ::-1, ::-1]
+    rotated[piece_planes_per_side:-1] = encoded[:piece_planes_per_side, ::-1, ::-1]
+    rotated[-1] = 1 - encoded[-1, ::-1, ::-1]
+    return rotated
 
 
 def _rotate_move(move: Move) -> Move:

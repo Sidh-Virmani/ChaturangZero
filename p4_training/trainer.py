@@ -17,6 +17,7 @@ from p2_neural_network import (
 from shared.game_core import GameState, Side
 
 from .config import TrainingConfig
+from .augmentation import augment_example
 from .data import ReplayBuffer
 from .self_play import play_game
 
@@ -98,6 +99,10 @@ class Trainer:
         recorded: list[tuple[float, float, float]] = []
         for _ in range(self.config.training_steps):
             examples = self.replay.sample(self.config.batch_size, self.sample_rng)
+            examples = tuple(
+                augment_example(example, self.sample_rng, self.config.symmetry_probability)
+                for example in examples
+            )
             states = torch.from_numpy(
                 np.stack([example.state for example in examples]).astype(np.float32)
             ).to(self.device)
@@ -172,6 +177,9 @@ class Trainer:
             raise ValueError("Checkpoint is incompatible with the current P1/P4 format")
 
         config_data = dict(saved["config"])
+        # Older runs did not augment; retain their original random stream and
+        # training behavior unless a new run is explicitly configured.
+        config_data.setdefault("symmetry_probability", 0.0)
         config_data["model"] = ModelConfig(**config_data["model"])
         config_data["checkpoint_dir"] = checkpoint_dir
         config_data["device"] = device

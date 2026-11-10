@@ -28,8 +28,14 @@ class TrainingConfig:
     device: str = "cpu"
     checkpoint_dir: Path = Path("checkpoints/p4_training")
     model: ModelConfig = field(default_factory=ModelConfig)
+    symmetry_probability: float = 0.5
 
     def __post_init__(self) -> None:
+        if (not isinstance(self.symmetry_probability, Real)
+                or isinstance(self.symmetry_probability, bool)
+                or not math.isfinite(float(self.symmetry_probability))
+                or not 0 <= self.symmetry_probability <= 1):
+            raise ValueError("symmetry_probability must be between 0 and 1")
         for name in (
             "iterations", "games_per_iteration", "simulations_per_move",
             "max_game_plies", "training_steps", "batch_size", "replay_capacity",

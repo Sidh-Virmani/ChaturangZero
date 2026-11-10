@@ -84,6 +84,10 @@ The `ReplayBuffer` holds examples from completed games up to `replay_capacity`. 
 
 During an update, P4 samples a **batch**: a small group of examples sent through P2 together. It samples with replacement, so even a small newly started replay buffer can fill a batch. Sampling from recent games gives the model a mixture of positions rather than teaching it only the last position it saw.
 
+Each sampled example has a 50% chance of being replaced for that batch by its equivalent position: rotate the board 180° and swap White and Black. P1 transforms the encoded piece grids and turn grid, and `rotate_action()` translates each stored move ID. The visit probabilities stay attached to their moves. The value also stays the same: if the player to move was winning before, the corresponding player is winning after the swap. Replay still stores one original example. `--symmetry-probability` on `smoke`, `train`, and `train-levels` sets the chance for a new run (`0` disables it, `1` always transforms).
+
+The decision uses the same saved random generator as replay sampling. Resume restores the saved probability and generator state; older checkpoints without this setting keep augmentation disabled. The network planes still omit repetition history. P1's full `rotate_state()` transforms history when it is present in a `GameState`.
+
 Replay is saved inside the full training checkpoint. Resuming a run keeps its previous examples; it does not start learning from an empty buffer. The compact stored policy form saves space, while each sampled batch is expanded to P2's full 4096-action format only when needed.
 
 ## 6. How one model update works

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import json
 from pathlib import Path
 
@@ -22,6 +22,7 @@ def main() -> None:
 
     smoke = commands.add_parser("smoke", help="One short complete game and update")
     smoke.add_argument("--output", type=Path, default=Path("checkpoints/p4_smoke"))
+    smoke.add_argument("--symmetry-probability", type=float, default=0.5)
 
     train = commands.add_parser("train", help="Start a new run from a random model")
     _add_training_arguments(train, default_output=Path("checkpoints/p4_training"))
@@ -83,6 +84,7 @@ def main() -> None:
             parser.error("training_state.pt already exists; use resume or a new --output")
         if args.command == "smoke":
             config = TrainingConfig.smoke(args.output)
+            config = replace(config, symmetry_probability=args.symmetry_probability)
             trainer = Trainer(config)
             metrics = trainer.run(smoke_position())
             if metrics[0].games_completed != 1 or metrics[0].updates != 1:
@@ -118,6 +120,7 @@ def _add_training_arguments(parser: argparse.ArgumentParser, *, default_output: 
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--channels", type=int, default=64)
     parser.add_argument("--blocks", type=int, default=4)
+    parser.add_argument("--symmetry-probability", type=float, default=0.5)
 
 
 def _training_config(args: argparse.Namespace, *, iterations: int) -> TrainingConfig:
@@ -136,6 +139,7 @@ def _training_config(args: argparse.Namespace, *, iterations: int) -> TrainingCo
         device=args.device,
         checkpoint_dir=args.output,
         model=ModelConfig(channels=args.channels, residual_blocks=args.blocks),
+        symmetry_probability=args.symmetry_probability,
     )
 
 
