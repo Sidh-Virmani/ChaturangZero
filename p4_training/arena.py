@@ -15,6 +15,7 @@ class ArenaResult:
     reference_wins: int
     truncated: int
     games: int
+    draws: int = 0
 
 
 def compare_models(
@@ -35,7 +36,7 @@ def compare_models(
     search_config = MCTSConfig(
         num_simulations=simulations_per_move, temperature=0.0, add_noise=False
     )
-    candidate_wins = reference_wins = truncated = 0
+    candidate_wins = reference_wins = truncated = draws = 0
 
     for game_index in range(games):
         candidate_side = Side.WHITE if game_index % 2 == 0 else Side.BLACK
@@ -54,9 +55,11 @@ def compare_models(
         outcome = terminal_status(state)
         if not outcome.terminal:
             truncated += 1
+        elif outcome.draw:
+            draws += 1
         elif outcome.winner is candidate_side:
             candidate_wins += 1
         else:
             reference_wins += 1
 
-    return ArenaResult(candidate_wins, reference_wins, truncated, games)
+    return ArenaResult(candidate_wins, reference_wins, truncated, games, draws)

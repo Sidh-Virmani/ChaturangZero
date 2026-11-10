@@ -57,6 +57,7 @@ class TerminalReason(str, Enum):
     CHECKMATE = "checkmate"
     BARE_KING = "bare_king"
     STALEMATE = "stalemate"
+    REPETITION = "repetition"
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,11 +67,17 @@ class Outcome:
 
     @property
     def terminal(self) -> bool:
-        return self.winner is not None
+        return self.winner is not None or self.reason is TerminalReason.REPETITION
+
+    @property
+    def draw(self) -> bool:
+        return self.terminal and self.winner is None
 
     def reward(self, perspective: Side) -> int:
         if not self.terminal:
             raise ValueError("A non-terminal position has no game result")
+        if self.draw:
+            return 0
         return 1 if perspective is self.winner else -1
 
 
@@ -80,6 +87,9 @@ class GameState:
     side_to_move: Side = Side.WHITE
     ply_count: int = 0
     last_move: Optional[Move] = None
+    # Prior positions only; current position counts once implicitly. Excludes
+    # ply_count/last_move because neither changes available Chaturanga moves.
+    position_history: tuple[tuple[tuple[Optional[Piece], ...], Side], ...] = ()
 
     def __post_init__(self) -> None:
         if len(self.board) != SQUARE_COUNT:
@@ -356,7 +366,9 @@ def _is_pseudo_legal(state: GameState, move: Move, piece: Piece) -> bool:
     return _piece_attacks_square(state, move.from_square, piece, move.to_square)
 
 
-def _move_without_validation(state: GameState, move: Move) -> GameState:
+def _move_without_validation(
+    state: GameState, move: Move, *, record_history: bool = False
+) -> GameState:
     board = list(state.board)
     piece = board[move.from_square]
     if piece is None:
@@ -371,6 +383,10 @@ def _move_without_validation(state: GameState, move: Move) -> GameState:
         side_to_move=state.side_to_move.opponent,
         ply_count=state.ply_count + 1,
         last_move=move,
+        position_history=(
+            state.position_history + ((state.board, state.side_to_move),)
+            if record_history else ()
+        ),
     )
 
 
@@ -408,7 +424,12 @@ def _apply_known_legal_move(state: GameState, move: Move) -> GameState:
     No legality or terminal recheck is performed. External callers must use
     apply_move. The existing core transition still owns capture and promotion.
     """
-    return _move_without_validation(state, move)
+    return _move_without_validation(state, move, record_history=True)
+
+
+def _is_repetition(state: GameState) -> bool:
+    """Project rule: third occurrence of board + player to move is a draw."""
+    return state.position_history.count((state.board, state.side_to_move)) >= 2
 
 
 def _analyze_for_search(state: GameState) -> tuple[tuple[Move, ...], Outcome]:
@@ -419,6 +440,8 @@ def _analyze_for_search(state: GameState) -> tuple[tuple[Move, ...], Outcome]:
 
     moves = _legal_moves_unchecked(state)
     if moves:
+        if _is_repetition(state):
+            return (), Outcome(reason=TerminalReason.REPETITION)
         return moves, Outcome()
     if is_in_check(state):
         return moves, Outcome(state.side_to_move.opponent, TerminalReason.CHECKMATE)
@@ -431,7 +454,7 @@ def terminal_status(state: GameState) -> Outcome:
 
 def legal_moves(state: GameState) -> tuple[Move, ...]:
     """Return only legal actions, in deterministic from/to index order."""
-    if _bare_king_winner(state) is not None:
+    if _bare_king_winner(state) is not None or _is_repetition(state):
         return ()
     return _legal_moves_unchecked(state)
 
@@ -451,7 +474,7 @@ def apply_move(state: GameState, move: Move | tuple[str, str]) -> GameState:
         raise GameOverError(f"Game already ended by {outcome.reason.value}")
     if move not in _legal_moves_unchecked(state):
         raise IllegalMoveError(f"Illegal Chaturanga move: {move.uci}")
-    return _move_without_validation(state, move)
+    return _apply_known_legal_move(state, move)
 
 
 def is_terminal(state: GameState) -> bool:
@@ -459,7 +482,7 @@ def is_terminal(state: GameState) -> bool:
 
 
 def result(state: GameState, perspective: Side) -> int:
-    """Return +1 for the victor and -1 for the loser."""
+    """Return +1 for the victor, -1 for the loser, or 0 for a draw."""
     return terminal_status(state).reward(perspective)
 
 

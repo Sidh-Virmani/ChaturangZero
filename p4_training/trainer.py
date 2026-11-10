@@ -35,6 +35,7 @@ class IterationMetrics:
     policy_loss: float | None
     value_loss: float | None
     total_loss: float | None
+    draws: int = 0
 
 
 class Trainer:
@@ -85,6 +86,7 @@ class Trainer:
                 policy_loss=_mean_or_none([item[0] for item in losses]),
                 value_loss=_mean_or_none([item[1] for item in losses]),
                 total_loss=_mean_or_none([item[2] for item in losses]),
+                draws=sum(game.outcome.draw for game in completed),
             )
             self.history.append(metrics)
             new_metrics.append(metrics)

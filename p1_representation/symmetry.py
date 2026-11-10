@@ -28,6 +28,11 @@ def rotate_state(state: GameState) -> GameState:
         side_to_move=state.side_to_move.opponent,
         ply_count=state.ply_count,
         last_move=None if state.last_move is None else _rotate_move(state.last_move),
+        position_history=tuple(
+            (tuple(None if piece is None else Piece(piece.side.opponent, piece.kind)
+                   for piece in reversed(past_board)), past_side.opponent)
+            for past_board, past_side in state.position_history
+        ),
     )
 
 

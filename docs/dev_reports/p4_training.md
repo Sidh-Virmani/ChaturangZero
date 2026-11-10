@@ -76,7 +76,7 @@ The policy is stored immediately after each search. The value cannot be filled i
 
 P3's searched policy is a useful teacher because it has looked ahead beyond P2's first guess. P4 trains P2 to imitate those improved search preferences. The outcome target trains P2's value head to estimate the eventual winner from each earlier position.
 
-There is currently no draw rule in `game_core`. If a game reaches `max_game_plies` without a core result, P4 marks it **truncated** and discards its pending examples. It does not invent a draw or claim that either player won. The truncation count is reported so a run with too many unfinished games is visible.
+The core now recognizes automatic third-occurrence repetition draws (see `phase2_repetition.md`). Those are completed games: all examples are retained with value 0. If a game reaches `max_game_plies` without a core result, P4 still marks it **truncated** and discards its pending examples. It does not invent a draw or claim that either player won.
 
 ## 5. Replay: learning from more than the newest game
 

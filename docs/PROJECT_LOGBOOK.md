@@ -234,3 +234,10 @@ Use this format:
 **Changed:** MCTS passes its core-generated legal moves to an explicit trusted evaluator method; ordinary single and batch evaluation keep generating their own masks.
 **Why:** Each evaluated search state previously generated legal moves twice.
 **Result:** Profiled legal generations fell **52 → 26** per 25-simulation search. Same benchmark/checkpoint: search **0.247 → 0.137 s**, throughput **101.34 → 182.06 simulations/s**, short self-play **19.09 → 26.79 plies/s**. Ordinary evaluator batch 1 stayed **5.108 → 5.100 ms/state**. All **106 tests passed**; candidate-state construction/validation inside legal generation remains the largest profile cost.
+
+## 2026-11-10 — Repetition / draw handling (Phase 2)
+
+**Changed:** Added an automatic draw on the third occurrence of the same board and player to move, tracked immutably by the core. This is a documented project anti-cycle rule; existing Chaturanga wins keep precedence.
+**Why:** Cyclic games previously reached the training cap and lost all their examples. Draws now finish normally with value 0, and arena/server/training metrics distinguish them from wins and truncations.
+**Result:** A fixed knight cycle now draws at ply 8 and retains 8 zero-value examples; a cap at ply 7 still truncates. Standard benchmark: 25-simulation search **0.137 → 0.164 s**, **182.06 → 152.54 simulations/s**, short self-play **26.79 → 20.06 plies/s**. Raw NN also slowed **1.233 → 1.736 ms/state**, so the measured regression cannot all be attributed to history tracking.
+**Tests:** 116 passed; existing win rules, promotion, lazy search, server reset, draw targets and replay/resume remain covered.

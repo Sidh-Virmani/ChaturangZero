@@ -238,8 +238,9 @@ class GameSession:
             status = {
                 "code": "terminal",
                 "label": reason,
-                "detail": f"{winner_name} wins by {reason.lower()}.",
-                "result": f"{winner_name} wins",
+                "detail": (f"Draw by {reason.lower()}." if outcome.draw
+                           else f"{winner_name} wins by {reason.lower()}."),
+                "result": "Draw" if outcome.draw else f"{winner_name} wins",
             }
         elif is_in_check(state):
             checked_name = "Ivory" if state.side_to_move is Side.WHITE else "Onyx"
