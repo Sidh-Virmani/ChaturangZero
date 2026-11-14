@@ -152,7 +152,7 @@ def test_training_metrics_count_completed_draws_without_running_updates(tmp_path
         model=ModelConfig(channels=8, residual_blocks=1, value_hidden=16),
     )
     trainer = Trainer(config)
-    monkeypatch.setattr(trainer, '_train_steps', lambda: [])
+    monkeypatch.setattr(trainer, '_train_steps', lambda updates: [])
     metrics = trainer.run()[0]
     assert metrics.games_completed == metrics.draws == 1
     assert metrics.games_truncated == metrics.white_wins == metrics.black_wins == 0

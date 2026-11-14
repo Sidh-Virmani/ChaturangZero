@@ -110,7 +110,11 @@ def _add_training_arguments(parser: argparse.ArgumentParser, *, default_output: 
     parser.add_argument("--games-per-iteration", type=int, default=2)
     parser.add_argument("--simulations", type=int, default=25)
     parser.add_argument("--max-plies", type=int, default=512)
-    parser.add_argument("--training-steps", type=int, default=50)
+    schedule = parser.add_mutually_exclusive_group()
+    schedule.add_argument("--training-passes", type=float,
+                          help="Updates = ceil(new examples * passes / batch size), default 1")
+    schedule.add_argument("--training-steps", type=int,
+                          help="Explicit fixed updates when replay exists, even with no new data")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--replay-capacity", type=int, default=20_000)
     parser.add_argument("--opening-plies", type=int, default=12)
@@ -131,6 +135,7 @@ def _training_config(args: argparse.Namespace, *, iterations: int) -> TrainingCo
         max_game_plies=args.max_plies,
         opening_temperature_plies=args.opening_plies,
         training_steps=args.training_steps,
+        training_passes=args.training_passes,
         batch_size=args.batch_size,
         replay_capacity=args.replay_capacity,
         learning_rate=args.learning_rate,

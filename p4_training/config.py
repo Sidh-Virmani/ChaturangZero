@@ -19,7 +19,7 @@ class TrainingConfig:
     simulations_per_move: int = 25
     max_game_plies: int = 512
     opening_temperature_plies: int = 12
-    training_steps: int = 50
+    training_steps: int | None = None
     batch_size: int = 64
     replay_capacity: int = 20_000
     learning_rate: float = 0.001
@@ -29,8 +29,24 @@ class TrainingConfig:
     checkpoint_dir: Path = Path("checkpoints/p4_training")
     model: ModelConfig = field(default_factory=ModelConfig)
     symmetry_probability: float = 0.5
+    training_passes: float | None = None
 
     def __post_init__(self) -> None:
+        if self.training_steps is not None and self.training_passes is not None:
+            raise ValueError("Choose training_passes or fixed training_steps")
+        if self.training_steps is None and self.training_passes is None:
+            object.__setattr__(self, "training_passes", 1.0)
+        if self.training_steps is not None and (
+            not isinstance(self.training_steps, int)
+            or isinstance(self.training_steps, bool) or self.training_steps <= 0
+        ):
+            raise ValueError("training_steps must be a positive integer")
+        if self.training_passes is not None and (
+            not isinstance(self.training_passes, Real)
+            or isinstance(self.training_passes, bool)
+            or not math.isfinite(float(self.training_passes)) or self.training_passes <= 0
+        ):
+            raise ValueError("training_passes must be finite and positive")
         if (not isinstance(self.symmetry_probability, Real)
                 or isinstance(self.symmetry_probability, bool)
                 or not math.isfinite(float(self.symmetry_probability))
@@ -38,7 +54,7 @@ class TrainingConfig:
             raise ValueError("symmetry_probability must be between 0 and 1")
         for name in (
             "iterations", "games_per_iteration", "simulations_per_move",
-            "max_game_plies", "training_steps", "batch_size", "replay_capacity",
+            "max_game_plies", "batch_size", "replay_capacity",
         ):
             value = getattr(self, name)
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
@@ -77,7 +93,6 @@ class TrainingConfig:
             simulations_per_move=1,
             max_game_plies=4,
             opening_temperature_plies=4,
-            training_steps=1,
             batch_size=2,
             replay_capacity=16,
             seed=7,

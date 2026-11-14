@@ -247,3 +247,10 @@ Use this format:
 **Changed:** Each sampled example can use its 180° rotated, colour-swapped board and matching move targets (50% by default). The value stays the same and replay stores only the original.
 **Why:** The network can learn from both versions of a position without playing extra games. The saved sampling RNG makes the choice reproducible on resume.
 **Result:** Forced-augmentation smoke training and resume each completed one game and one finite update. The frozen `hard.pt` still shows mean value gap 0.473 and policy L1 gap 0.766 across three symmetric position pairs; this is a baseline, not a strength result.
+
+## 2026-11-11 — Data-scaled training updates (Phase 4)
+
+**Changed** Normal updates now equal `ceil(new examples × training passes / batch size)`, with one pass by default. Fixed-step replay fitting requires an explicit setting, and older checkpoints migrate to the scaled schedule.
+**Why** An iteration with no new positions previously continued fitting old replay and could report falling loss without new self-play information.
+**Result** A controlled run generated one example and performed two finite updates at three passes/batch two. After resume, a truncated game generated zero examples and performed zero updates despite populated replay, preserving all model weights.
+**Tests** 150 passed. The existing benchmark state also loads with the migrated schedule and a zero-update budget for zero new examples.

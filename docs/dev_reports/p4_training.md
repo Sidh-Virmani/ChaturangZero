@@ -92,7 +92,7 @@ Replay is saved inside the full training checkpoint. Resuming a run keeps its pr
 
 ## 6. How one model update works
 
-For each configured training step, `Trainer`:
+For each scheduled training step, `Trainer` performs the following work.
 
 ```text
 samples a batch from replay
@@ -110,7 +110,17 @@ A **gradient** tells a parameter which direction would reduce the measured error
 
 The policy loss rewards logits that match P3's searched move distribution. The value loss rewards values closer to the actual final outcome. P4 reports average policy, value, and combined loss for the steps in each iteration, along with completed/truncated games, wins by color, examples added, replay size, and average game length.
 
-One **iteration** means: play `games_per_iteration` games, add completed examples to replay, run `training_steps` updates if replay has examples, then save checkpoints. If this iteration produces only truncated games but replay already contains older completed games, training can still update from that replay. If replay is empty, the update count is zero.
+One **iteration** plays `games_per_iteration` games, adds completed examples to replay, calculates an update budget from the new examples, performs those updates, and saves checkpoints. New runs default to `training_passes=1`. A pass specifies how many sampled positions to budget for each new example. Batches still sample from the entire replay buffer.
+
+The budget rounds up to a whole batch using this formula.
+
+```text
+updates = ceil(new_examples * training_passes / batch_size)
+```
+
+With one pass and batch size 64, 0 new examples produce 0 updates, 1–64 produce 1, 65 produce 2, and 640 produce 10. Small datasets can receive more than the requested ratio because the final batch is rounded up. Generated examples count even if replay capacity drops older entries. Iterations that only truncate produce no new examples and perform zero normal updates, including when replay already contains data.
+
+For explicitly fixed work, `--training-steps N` retains its original meaning of N updates whenever replay has examples. This mode allows replay-only updates during iterations that generate no data. It is mutually exclusive with `--training-passes`. Empty replay always produces zero updates. Metrics record the actual `updates`, `examples_added`, `replay_size`, `batch_size`, and either `training_passes` or `training_steps`, so the active budget is visible.
 
 The updated model is the source of guidance for the next iteration. Lower loss shows that the model fit its recent targets better; it does not prove stronger play by itself. P4 also provides an optional arena comparison to measure results against another checkpoint.
 
@@ -125,6 +135,8 @@ The files are written through temporary files and replaced after successful seri
 
 The resume command's `--iterations` means **additional iterations**. For example, if the checkpoint says 3 iterations are complete, `resume --iterations 2` runs iterations 4 and 5. It keeps the saved model architecture and training settings; the resume command can choose a device, such as CPU or CUDA.
 
+Scheduling settings are saved with the training state. Checkpoints written before Phase 4 lack the `training_passes` field and always contain an old step count, often the implicit default 50. On loading those checkpoints, P4 migrates to one data-scaled pass and clears that step count. This deliberately changes their update budget while restoring model, optimizer, replay and random streams. Exact continuation of their former update sequence is therefore affected. New checkpoints preserve either selected schedule on resume. Older metrics lack schedule fields and load those fields as `None`.
+
 The smoke command also loads its newly written `latest_model.pt` and evaluates a position with it. That verifies the model-only checkpoint can actually be used again.
 
 ## 8. Reproducibility and practical limits
@@ -135,7 +147,7 @@ CPU execution is supported. A normal PyTorch device name can be supplied for an 
 
 Games from the standard initial position may be long, especially while the model is untrained. More simulations improve the search target but cost more time. The normal command is deliberately not started automatically. Watch `games_truncated` and `examples_added`: if many games hit the cap, raise the ply limit or investigate play before trusting the training metrics.
 
-P1's symmetry utility is available for future augmentation experiments. P4 currently trains on actual self-play positions only; it does not silently add transformed examples.
+Sample preparation uses P1 symmetry with the configured probability and saved sampling RNG. Its behavior is covered by exact continuous-versus-resumed training tests under the data-scaled schedule.
 
 ## 9. Optional model comparison
 
@@ -168,7 +180,7 @@ Run from the repository root in PowerShell. The smoke run is short and uses a fo
 The verified run completed one game in one ply, made one network update, wrote both checkpoints, and reloaded the model. Use a fresh output directory for each new smoke or training run. To start normal training from the standard initial position:
 
 ```powershell
-.\.venv\Scripts\python.exe -m p4_training train --output checkpoints\run1 --iterations 1 --games-per-iteration 2 --simulations 25 --training-steps 50
+.\.venv\Scripts\python.exe -m p4_training train --output checkpoints\run1 --iterations 1 --games-per-iteration 2 --simulations 25 --training-passes 1
 ```
 
 That command can take substantial time because it searches on every move. The defaults are 512 maximum plies, a 64-channel/four-block P2 model, batch size 64, replay capacity 20,000, CPU, and seed 0. Use `--max-plies`, `--batch-size`, `--channels`, `--blocks`, `--opening-plies`, and the other CLI flags to adjust a new run.

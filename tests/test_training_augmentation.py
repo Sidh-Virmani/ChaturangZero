@@ -88,7 +88,7 @@ def test_trainer_consumes_rotated_batch_without_modifying_replay(tmp_path):
     inputs = []
     handle = trainer.model.register_forward_pre_hook(lambda model, args: inputs.append(args[0].clone()))
     try:
-        losses = trainer._train_steps()
+        losses = trainer._train_steps(1)
     finally:
         handle.remove()
     np.testing.assert_array_equal(inputs[0][0].numpy(), rotate_example(example).state)

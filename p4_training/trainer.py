@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from random import Random
+import math
 
 import numpy as np
 import torch
@@ -37,6 +38,9 @@ class IterationMetrics:
     value_loss: float | None
     total_loss: float | None
     draws: int = 0
+    training_passes: float | None = None
+    training_steps: int | None = None
+    batch_size: int | None = None
 
 
 class Trainer:
@@ -71,14 +75,16 @@ class Trainer:
             for game in game_results:
                 self.replay.add_game(game.examples)
 
-            losses = self._train_steps() if len(self.replay) else []
+            examples_added = sum(len(game.examples) for game in game_results)
+            updates = self.update_count(examples_added)
+            losses = self._train_steps(updates) if updates else []
             completed = [game for game in game_results if not game.truncated]
             self.completed_iterations += 1
             metrics = IterationMetrics(
                 iteration=self.completed_iterations,
                 games_completed=len(completed),
                 games_truncated=len(game_results) - len(completed),
-                examples_added=sum(len(game.examples) for game in game_results),
+                examples_added=examples_added,
                 replay_size=len(self.replay),
                 average_plies=sum(game.plies for game in game_results) / len(game_results),
                 white_wins=sum(game.outcome.winner is Side.WHITE for game in completed),
@@ -88,16 +94,29 @@ class Trainer:
                 value_loss=_mean_or_none([item[1] for item in losses]),
                 total_loss=_mean_or_none([item[2] for item in losses]),
                 draws=sum(game.outcome.draw for game in completed),
+                training_passes=self.config.training_passes,
+                training_steps=self.config.training_steps,
+                batch_size=self.config.batch_size,
             )
             self.history.append(metrics)
             new_metrics.append(metrics)
             self.save()
         return tuple(new_metrics)
 
-    def _train_steps(self) -> list[tuple[float, float, float]]:
+    def update_count(self, new_examples: int) -> int:
+        """Budget updates from new data, or an explicitly selected fixed schedule."""
+        if not isinstance(new_examples, int) or isinstance(new_examples, bool) or new_examples < 0:
+            raise ValueError("new_examples must be a non-negative integer")
+        if not len(self.replay):
+            return 0
+        if self.config.training_steps is not None:
+            return self.config.training_steps
+        return math.ceil(new_examples * self.config.training_passes / self.config.batch_size)
+
+    def _train_steps(self, updates: int) -> list[tuple[float, float, float]]:
         self.model.train()
         recorded: list[tuple[float, float, float]] = []
-        for _ in range(self.config.training_steps):
+        for _ in range(updates):
             examples = self.replay.sample(self.config.batch_size, self.sample_rng)
             examples = tuple(
                 augment_example(example, self.sample_rng, self.config.symmetry_probability)
@@ -177,6 +196,11 @@ class Trainer:
             raise ValueError("Checkpoint is incompatible with the current P1/P4 format")
 
         config_data = dict(saved["config"])
+        if "training_passes" not in config_data:
+            # Old configs always included a default step count. Migrate to
+            # data-scaled work so zero-data iterations do not fit stale replay.
+            config_data["training_steps"] = None
+            config_data["training_passes"] = 1.0
         # Older runs did not augment; retain their original random stream and
         # training behavior unless a new run is explicitly configured.
         config_data.setdefault("symmetry_probability", 0.0)
