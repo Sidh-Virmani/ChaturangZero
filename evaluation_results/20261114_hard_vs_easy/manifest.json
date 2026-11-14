@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "protocol": "paired-fixed-openings-v1",
+  "status": "complete",
+  "started_utc": "2026-11-14T08:42:32.619382+00:00",
+  "models": {
+    "candidate": {
+      "path": "C:\\Users\\Sidh\\Desktop\\Sidh\\CS\\Projects\\ChaturangZero\\checkpoints\\benchmark\\hard.pt",
+      "sha256": "adbbb5332453ab95909b0775c34592678ff2cd8b663c9176aa79abe9b868acf4",
+      "model_config": {
+        "channels": 64,
+        "residual_blocks": 4,
+        "policy_channels": 2,
+        "value_hidden": 128
+      }
+    },
+    "reference": {
+      "path": "C:\\Users\\Sidh\\Desktop\\Sidh\\CS\\Projects\\ChaturangZero\\checkpoints\\benchmark\\easy.pt",
+      "sha256": "325d166f6a4598832740bd382874eca8f7d24c723989a3c9a8860fbc4bfe9da6",
+      "model_config": {
+        "channels": 64,
+        "residual_blocks": 4,
+        "policy_channels": 2,
+        "value_hidden": 128
+      }
+    }
+  },
+  "environment": {
+    "git_commit": "0cf8d16f3b266cf7e1ab2aa80054f63aae677012",
+    "git_status": "M p4_training/__main__.py\n M p4_training/arena.py\n M p4_training/trainer.py\n?? docs/dev_reports/evaluation_and_experiments.md\n?? evaluation_results/\n?? p4_training/evaluation.py\n?? p4_training/evaluation_openings.json\n?? p4_training/openings.py\n?? p4_training/recording.py\n?? tests/test_evaluation_experiments.py\n?? tests/test_training_recording.py",
+    "ai_source_sha256": "6b57a623fe878875f7b6544fbebbf0d704ac416f84e599bec2679f5fe6e96fc6",
+    "python": "3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "torch": "2.14.0+cpu",
+    "numpy": "2.5.3",
+    "device": "cpu",
+    "torch_threads": 8,
+    "torch_interop_threads": 8,
+    "deterministic_algorithms": false
+  },
+  "openings_sha256": "1a7c704844e03b368ed96f2669b4666951ef67f8849a1172b324c5e86d264267",
+  "config": {
+    "pairs": 3,
+    "games": 6,
+    "search": {
+      "num_simulations": 5,
+      "c_puct": 1.5,
+      "dirichlet_alpha": 0.3,
+      "dirichlet_epsilon": 0.25,
+      "temperature": 0.0,
+      "add_noise": false
+    },
+    "max_plies_after_opening": 128,
+    "device": "cpu",
+    "tree_policy": "fresh MCTS per move; no cross-model tree reuse",
+    "tie_break": "P3 deterministic action ordering"
+  },
+  "finished_utc": "2026-11-14T08:43:01.891171+00:00"
+}
