@@ -254,3 +254,10 @@ Use this format:
 **Why** An iteration with no new positions previously continued fitting old replay and could report falling loss without new self-play information.
 **Result** A controlled run generated one example and performed two finite updates at three passes/batch two. After resume, a truncated game generated zero examples and performed zero updates despite populated replay, preserving all model weights.
 **Tests** 150 passed. The existing benchmark state also loads with the migrated schedule and a zero-update budget for zero new examples.
+
+## 2026-11-14 — Paired evaluation and durable experiment records
+
+**Changed:** Added a frozen 12-opening suite with both colour assignments, replay-verifiable game records, checkpoint/code fingerprints and JSON/CSV results. Training now exports iteration metrics, timings and configuration beside resume state.
+**Why:** Repeating deterministic games from one board overstated the amount of evidence, while training history was difficult to inspect outside checkpoints.
+**Result:** Three preliminary six-game comparisons of Hard against Easy, Medium and a fixed untrained model produced 11 repetition draws and 7 truncations, with no decisive games; this does not establish a strength ranking. All 18 exported games passed core replay verification, and smoke/resume logs preserved the zero-new-data/zero-update rule.
+**Tests:** 165 passed. Existing benchmark checkpoint hashes are unchanged; no long training run was started.

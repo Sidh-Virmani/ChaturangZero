@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field, replace
+from datetime import datetime, timezone
+import json
 from pathlib import Path
 from random import Random
 import math
+from time import perf_counter
 
 import numpy as np
 import torch
@@ -21,6 +24,7 @@ from .config import TrainingConfig
 from .augmentation import augment_example
 from .data import ReplayBuffer
 from .self_play import play_game
+from .recording import atomic_text, file_sha256, json_text, provenance
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +45,10 @@ class IterationMetrics:
     training_passes: float | None = None
     training_steps: int | None = None
     batch_size: int | None = None
+    self_play_seconds: float | None = field(default=None, compare=False)
+    training_seconds: float | None = field(default=None, compare=False)
+    elapsed_seconds: float | None = field(default=None, compare=False)
+    audit: dict | None = field(default=None, compare=False)
 
 
 class Trainer:
@@ -63,11 +71,13 @@ class Trainer:
         self.replay = ReplayBuffer(config.replay_capacity)
         self.completed_iterations = 0
         self.history: list[IterationMetrics] = []
+        self.environment = provenance(config.device)
 
     def run(self, start_state: GameState | None = None) -> tuple[IterationMetrics, ...]:
         """Run ``config.iterations`` more cycles and checkpoint after each one."""
         new_metrics: list[IterationMetrics] = []
         for _ in range(self.config.iterations):
+            started = perf_counter()
             game_results = [
                 play_game(self.evaluator, self.config, start_state)
                 for _ in range(self.config.games_per_iteration)
@@ -77,7 +87,9 @@ class Trainer:
 
             examples_added = sum(len(game.examples) for game in game_results)
             updates = self.update_count(examples_added)
+            training_started = perf_counter()
             losses = self._train_steps(updates) if updates else []
+            finished = perf_counter()
             completed = [game for game in game_results if not game.truncated]
             self.completed_iterations += 1
             metrics = IterationMetrics(
@@ -97,10 +109,20 @@ class Trainer:
                 training_passes=self.config.training_passes,
                 training_steps=self.config.training_steps,
                 batch_size=self.config.batch_size,
+                self_play_seconds=training_started - started,
+                training_seconds=finished - training_started,
+                elapsed_seconds=finished - started,
+                audit={
+                    'completed_utc': datetime.now(timezone.utc).isoformat(),
+                    'environment': self.environment,
+                    'config': {**asdict(self.config), 'checkpoint_dir': str(self.config.checkpoint_dir)},
+                    'start_state': json.loads(json.dumps(asdict(start_state))) if start_state is not None else 'initial',
+                    'learning_rates': [group['lr'] for group in self.optimizer.param_groups],
+                },
             )
             self.history.append(metrics)
-            new_metrics.append(metrics)
             self.save()
+            new_metrics.append(self.history[-1])
         return tuple(new_metrics)
 
     def update_count(self, new_examples: int) -> int:
@@ -155,6 +177,12 @@ class Trainer:
         model_temp = directory / "latest_model.tmp"
         save_checkpoint(self.model, model_temp)
         model_temp.replace(directory / "latest_model.pt")
+        model_identity = {'path': str((directory / 'latest_model.pt').resolve()),
+                          'sha256': file_sha256(directory / 'latest_model.pt')}
+        if self.history and self.history[-1].audit is not None:
+            self.history[-1] = replace(self.history[-1], audit={
+                **self.history[-1].audit, 'checkpoint': model_identity,
+            })
 
         numpy_state = np.random.get_state()
         config_data = asdict(self.config)
@@ -180,6 +208,19 @@ class Trainer:
         state_temp = directory / "training_state.tmp"
         torch.save(payload, state_temp)
         state_temp.replace(directory / "training_state.pt")
+        # The committed resume checkpoint is authoritative. Rebuild its small
+        # history view atomically, rather than appending duplicate/stale rows on resume.
+        atomic_text(directory / 'metrics.jsonl', ''.join(
+            json.dumps(asdict(item), allow_nan=False) + '\n' for item in self.history
+        ))
+        atomic_text(directory / 'run.json', json_text({
+            'version': 1, 'completed_iterations': self.completed_iterations,
+            'config': config_data, 'environment': self.environment,
+            'latest_model': model_identity,
+            'training_state_sha256': file_sha256(directory / 'training_state.pt'),
+            'timing_scope': 'self-play and optimizer work; excludes checkpoint/log I/O',
+            'history_source': 'training_state.pt; older rows may lack audit/timing fields',
+        }))
 
     @classmethod
     def resume(

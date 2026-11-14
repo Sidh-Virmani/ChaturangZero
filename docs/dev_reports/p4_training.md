@@ -167,7 +167,7 @@ This is an optional evaluation command, separate from the training loop. It does
 
 **`Trainer(config)`** owns the current P2 model, evaluator, AdamW optimizer, replay, iteration count, and metrics. `trainer.run()` performs the requested additional iterations. `Trainer.resume(directory, iterations, device)` reconstructs a full saved run. `trainer.save()` writes both checkpoint types.
 
-**`compare_models()`** runs the optional arena between two P2 models without changing either one's weights.
+**`compare_models()`** remains a small compatibility/smoke arena. For strength evidence, use `evaluate_checkpoints()` and the `evaluate` command: they play paired colours from distinct saved openings and export individual games. See [Evaluation and experiment measurement](evaluation_and_experiments.md) for the protocol, baselines, commands and interpretation.
 
 ## 11. Exact commands
 
@@ -207,15 +207,15 @@ Each completed iteration prints its metrics plus a line such as:
 iteration=12/60 elapsed=00:18:42 eta=14:57:36
 ```
 
-The remaining-time estimate uses the average duration of iterations completed during the current invocation. It becomes more useful after several iterations. The normal defaults remain 2 games per iteration, 25 MCTS simulations per move, a 512-ply game cap, 50 network updates per iteration, batch size 64, and CPU. Use `--device cuda` only on a machine where PyTorch reports CUDA support.
+The remaining-time estimate uses the average duration of iterations completed during the current invocation. It becomes more useful after several iterations. The normal defaults are 2 games per iteration, 25 MCTS simulations per move, a 512-ply game cap, one data-scaled training pass, batch size 64, and CPU. Updates equal `ceil(new examples / 64)` at these defaults, including zero updates when no examples are generated. Use `--device cuda` only on a machine where PyTorch reports CUDA support.
 
 To compare two model checkpoints after training:
 
 ```powershell
-.\.venv\Scripts\python.exe -m p4_training arena --candidate checkpoints\run1\latest_model.pt --reference checkpoints\baseline\latest_model.pt --games 10 --simulations 25
+.\.venv\Scripts\python.exe -m p4_training evaluate --candidate checkpoints\run1\latest_model.pt --reference checkpoints\baseline\latest_model.pt --output evaluation_results\run1_baseline --simulations 25
 ```
 
-`baseline` in that example must be a checkpoint you already saved. Each training iteration prints one JSON line of metrics and the paths to the model and resume checkpoints.
+`baseline` in that example must be a checkpoint you already saved. Evaluation uses all twelve fixed openings in both colours and requires a new output directory. Each training iteration prints a concise JSON line of metrics and writes `metrics.jsonl` plus `run.json` alongside its checkpoints. These text files expose counts, losses, update budget, timings, config, code/environment identity and checkpoint fingerprints. Resume state remains authoritative; the text history is rebuilt after each successful save to avoid duplicate/stale rows. Old rows keep unknown timing/provenance as null. See the evaluation report linked above for crash behavior and statistical limitations.
 
 ## 12. What the tests prove
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import perf_counter
 
 from p2_neural_network import NetworkEvaluator, PolicyValueNetwork
 from p3_mcts import MCTS, MCTSConfig
@@ -16,6 +17,29 @@ class ArenaResult:
     truncated: int
     games: int
     draws: int = 0
+
+
+def play_match(candidate_evaluator, reference_evaluator, candidate_side: Side,
+               state: GameState, search_config: MCTSConfig, max_game_plies: int) -> dict:
+    """One game; fresh search per move gives both models the same search budget."""
+    started = perf_counter()
+    moves = []
+    for _ in range(max_game_plies):
+        if terminal_status(state).terminal:
+            break
+        evaluator = candidate_evaluator if state.side_to_move is candidate_side else reference_evaluator
+        _, move, _ = MCTS(evaluator, search_config).search(state)
+        state = apply_move(state, move)
+        moves.append(move.uci)
+    outcome = terminal_status(state)
+    result = ('truncation' if not outcome.terminal else 'draw' if outcome.draw else
+              'win' if outcome.winner is candidate_side else 'loss')
+    return {'candidate_color': candidate_side.value, 'result': result,
+            'winner': outcome.winner.value if outcome.winner else None,
+            'terminal_reason': outcome.reason.value if outcome.reason else None,
+            'stop_reason': outcome.reason.value if outcome.reason else 'max_game_plies',
+            'plies': len(moves), 'final_ply_count': state.ply_count,
+            'moves': moves, 'elapsed_seconds': perf_counter() - started}
 
 
 def compare_models(
@@ -40,24 +64,14 @@ def compare_models(
 
     for game_index in range(games):
         candidate_side = Side.WHITE if game_index % 2 == 0 else Side.BLACK
-        state = initial_state() if start_state is None else start_state
-        for _ in range(max_game_plies):
-            outcome = terminal_status(state)
-            if outcome.terminal:
-                break
-            evaluator = (
-                candidate_evaluator if state.side_to_move is candidate_side
-                else reference_evaluator
-            )
-            _, move, _ = MCTS(evaluator, search_config).search(state)
-            state = apply_move(state, move)
-
-        outcome = terminal_status(state)
-        if not outcome.terminal:
+        record = play_match(candidate_evaluator, reference_evaluator, candidate_side,
+                            initial_state() if start_state is None else start_state,
+                            search_config, max_game_plies)
+        if record['result'] == 'truncation':
             truncated += 1
-        elif outcome.draw:
+        elif record['result'] == 'draw':
             draws += 1
-        elif outcome.winner is candidate_side:
+        elif record['result'] == 'win':
             candidate_wins += 1
         else:
             reference_wins += 1

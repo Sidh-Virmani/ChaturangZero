@@ -6,6 +6,7 @@ import argparse
 from dataclasses import asdict, replace
 import json
 from pathlib import Path
+import sys
 
 from p2_neural_network import ModelConfig, NetworkEvaluator, load_checkpoint
 
@@ -14,6 +15,9 @@ from .config import TrainingConfig
 from .levels import LevelProgress, train_levels
 from .self_play import smoke_position
 from .trainer import Trainer
+from .evaluation import evaluate_checkpoints, freeze_baseline, verify_experiment
+from .openings import DEFAULT_SUITE, generate_openings
+from .recording import json_text
 
 
 def main() -> None:
@@ -49,8 +53,57 @@ def main() -> None:
     arena.add_argument("--max-plies", type=int, default=512)
     arena.add_argument("--device", default="cpu")
 
+    evaluate = commands.add_parser('evaluate', help='Paired fixed-opening checkpoint experiment')
+    evaluate.add_argument('--candidate', type=Path, required=True)
+    evaluate.add_argument('--reference', type=Path, required=True)
+    evaluate.add_argument('--output', type=Path, required=True, help='New experiment directory')
+    evaluate.add_argument('--openings', type=Path, default=DEFAULT_SUITE)
+    evaluate.add_argument('--pairs', type=int, help='First N openings; default entire suite')
+    evaluate.add_argument('--simulations', type=int, default=25)
+    evaluate.add_argument('--max-plies', type=int, default=512)
+    evaluate.add_argument('--c-puct', type=float, default=1.5)
+    evaluate.add_argument('--device', default='cpu')
+    baseline = commands.add_parser('freeze-baseline', help='Save a seeded untrained model once')
+    baseline.add_argument('--output', type=Path, required=True, help='New baseline directory')
+    baseline.add_argument('--seed', type=int, default=0)
+    openings = commands.add_parser('make-openings', help='Freeze a model-independent opening suite')
+    openings.add_argument('--output', type=Path, required=True)
+    openings.add_argument('--count', type=int, default=24)
+    openings.add_argument('--seed', type=int, default=20261114)
+    verify = commands.add_parser('verify-evaluation', help='Replay and verify a completed experiment')
+    verify.add_argument('--output', type=Path, required=True)
+
     args = parser.parse_args()
+    if args.command == 'verify-evaluation':
+        print(json.dumps(verify_experiment(args.output)))
+        return
+    if args.command == 'freeze-baseline':
+        print(freeze_baseline(args.output, args.seed))
+        return
+    if args.command == 'make-openings':
+        suite = generate_openings(args.count, args.seed)
+        with args.output.open('x', encoding='utf-8') as stream:
+            stream.write(json_text(suite))
+        print(args.output)
+        return
+    if args.command == 'evaluate':
+        result = evaluate_checkpoints(
+            args.candidate, args.reference, args.output, openings_path=args.openings,
+            pairs=args.pairs, simulations=args.simulations, max_plies=args.max_plies,
+            c_puct=args.c_puct, device=args.device,
+            on_game=lambda item: print(
+                f"game={item['game']} opening={item['opening_id']} "
+                f"candidate={item['candidate_color']} result={item['result']} "
+                f"plies={item['plies']}", flush=True),
+        )
+        print(f"W/L/D/T: {result['wins']}/{result['losses']}/{result['draws']}/{result['truncations']}")
+        print(f"Completed-game score: {result['completed_game_score']}; "
+              f"all-game bounds: {result['all_game_score_bounds']}; "
+              f"average plies: {result['average_plies']:.1f}")
+        print(f"Results: {args.output}")
+        return
     if args.command == "arena":
+        print('Legacy smoke comparison only: use evaluate for recorded paired-opening evidence.', file=sys.stderr)
         result = compare_models(
             load_checkpoint(args.candidate, args.device),
             load_checkpoint(args.reference, args.device),
@@ -97,7 +150,7 @@ def main() -> None:
             metrics = trainer.run()
 
     for item in metrics:
-        print(json.dumps(asdict(item)))
+        print(_metrics_json(item))
     print(f"model={trainer.config.checkpoint_dir / 'latest_model.pt'}")
     print(f"resume={trainer.config.checkpoint_dir / 'training_state.pt'}")
     if args.command == "train-levels":
@@ -157,7 +210,13 @@ def _print_level_progress(progress: LevelProgress, hard: int) -> None:
         f"eta={_format_duration(progress.estimated_remaining_seconds)}{milestone}",
         flush=True,
     )
-    print(json.dumps(asdict(progress.metrics)), flush=True)
+    print(_metrics_json(progress.metrics), flush=True)
+
+
+def _metrics_json(metrics) -> str:
+    fields = asdict(metrics)
+    fields.pop('audit', None)  # Full provenance lives in metrics.jsonl, not console noise.
+    return json.dumps(fields)
 
 
 def _format_duration(seconds: float) -> str:
