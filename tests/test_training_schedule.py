@@ -102,6 +102,7 @@ def test_cli_schedule_selection(tmp_path, monkeypatch):
     import sys
     recorded = []
     class CaptureTrainer:
+        completed_iterations = 0
         def __init__(self, config):
             self.config = config
             recorded.append(config)

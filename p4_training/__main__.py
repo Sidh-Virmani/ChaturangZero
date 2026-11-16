@@ -18,6 +18,7 @@ from .trainer import Trainer
 from .evaluation import evaluate_checkpoints, freeze_baseline, verify_experiment
 from .openings import DEFAULT_SUITE, generate_openings
 from .recording import json_text
+from .operations import training_lock, run_with_progress
 
 
 def main() -> None:
@@ -42,7 +43,9 @@ def main() -> None:
 
     resume = commands.add_parser("resume", help="Continue an existing run")
     resume.add_argument("--output", type=Path, default=Path("checkpoints/p4_training"))
-    resume.add_argument("--iterations", type=int, default=1, help="Additional iterations")
+    resume_count = resume.add_mutually_exclusive_group()
+    resume_count.add_argument("--iterations", type=int, default=1, help="Additional iterations")
+    resume_count.add_argument('--until', type=int, help='Stop at this absolute completed iteration')
     resume.add_argument("--device", default="cpu")
 
     arena = commands.add_parser("arena", help="Compare two model checkpoints")
@@ -115,6 +118,17 @@ def main() -> None:
         print(json.dumps(asdict(result)))
         return
 
+    try:
+        with training_lock(args.output):
+            _run_training(args, parser)
+    except KeyboardInterrupt:
+        print(f'Interrupted. Workers stopped; discard in-flight work. Resume from '
+              f'{args.output / "training_state.pt"} if present. Do not start a fresh run here.',
+              file=sys.stderr, flush=True)
+        raise SystemExit(130) from None
+
+
+def _run_training(args, parser):
     if args.command == "train-levels":
         config = _training_config(args, iterations=1)
         if (args.output / "training_state.pt").exists():
@@ -131,10 +145,18 @@ def main() -> None:
         metrics = ()
     elif args.command == "resume":
         trainer = Trainer.resume(args.output, args.iterations, args.device)
-        trainer.run(on_game=_print_game, on_iteration=_print_iteration, on_wait=_print_wait)
+        if args.until is not None:
+            if args.until < 1:
+                parser.error('--until must be positive')
+            remaining = args.until - trainer.completed_iterations
+            if remaining <= 0:
+                print(f'Already completed {trainer.completed_iterations}; target {args.until} requires no updates.')
+                return
+            trainer.config = replace(trainer.config, iterations=remaining)
+        run_with_progress(trainer, _print_iteration, _print_game, _print_wait)
         metrics = ()
     else:
-        if args.output.exists() and any(args.output.iterdir()):
+        if args.output.exists() and any(path.name != '.training.lock' for path in args.output.iterdir()):
             parser.error("Output directory is not empty; use resume or a new --output")
         if args.command == "smoke":
             config = TrainingConfig.smoke(args.output)
@@ -148,7 +170,7 @@ def main() -> None:
         else:
             config = _training_config(args, iterations=args.iterations)
             trainer = Trainer(config)
-            trainer.run(on_game=_print_game, on_iteration=_print_iteration, on_wait=_print_wait)
+            run_with_progress(trainer, _print_iteration, _print_game, _print_wait)
             metrics = ()
 
     for item in metrics:

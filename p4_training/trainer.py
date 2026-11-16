@@ -82,6 +82,8 @@ class Trainer:
             on_game: Callable | None = None, on_iteration: Callable | None = None,
             on_wait: Callable | None = None) -> tuple[IterationMetrics, ...]:
         """Run ``config.iterations`` more cycles and checkpoint after each one."""
+        if self.completed_iterations == 0 and not (self.config.checkpoint_dir / 'training_state.pt').exists():
+            self.save()  # First-game interruption must also have a restart point.
         new_metrics: list[IterationMetrics] = []
         for _ in range(self.config.iterations):
             started = perf_counter()
@@ -224,7 +226,7 @@ class Trainer:
         state_temp = directory / "training_state.tmp"
         torch.save(payload, state_temp)
         state_temp.replace(directory / "training_state.pt")
-        if self.config.snapshot_interval and self.completed_iterations % self.config.snapshot_interval == 0:
+        if self.completed_iterations > 0 and self.config.snapshot_interval and self.completed_iterations % self.config.snapshot_interval == 0:
             from .levels import _copy_without_overwrite
             _copy_without_overwrite(directory / 'latest_model.pt',
                                     directory / f'iteration_{self.completed_iterations:06d}.pt')

@@ -1,5 +1,9 @@
 # Choosing a practical training run
 
+For the current start/resume/monitor/evaluate commands and interruption behavior,
+use [the serious-training runbook](../SERIOUS_TRAINING.md). The historical commands
+below describe the measured pilot; `resume --until 200` now supports an exact total.
+
 ## What changed
 
 P4 can play independent games in CPU worker processes. Each worker receives a

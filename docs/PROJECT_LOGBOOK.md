@@ -268,3 +268,10 @@ Use this format:
 **Why:** Independent games can use more CPU cores while batched network updates benefit from the RTX 4060. One thread per worker avoided oversubscription.
 **Result:** Matched four-game workload improved **71.1 → 26.4 s** with four workers (2.69×); six workers beat four by another 21% on six games. CUDA batch-128 updates were **42.0 → 6.0 ms** versus CPU on the same build. A resumed 12-game pilot at 50 simulations retained **2,623 examples**, approximately **295 games/hour / 64,500 examples/hour** over its short compute window; these are extrapolations, not sustained-run guarantees.
 **Decision:** Recommend six CPU workers/one thread each and CUDA batch-128 training. Fifty simulations supplied decisive targets where the small frozen-model 25-simulation sample only drew; 100 cost more and truncated more. Tiny pilot evaluation established no strength gain. CPU tests: **178 passed, 1 skipped**; CUDA environment: **179 passed**. No serious run started; existing benchmark hashes are unchanged.
+
+## 2026-11-16 — Unattended training safeguards
+
+**Changed:** Training saves a restart point before the first game, rejects concurrent CLI writers to one directory, and prints wall-time/ETA progress. Resume can stop at an exact total with `--until 200` and gives a clear Ctrl+C recovery message.
+**Why:** Interrupting iteration 1 previously had no saved restart point, and resuming with additional iterations could accidentally extend the planned run.
+**Result:** Tiny tests recover initial weights after first-game interruption, reject a second writer, and verify that repeating an already-completed target performs no updates. The serious run was not launched; the operational runbook is `docs/SERIOUS_TRAINING.md`.
+**Tests:** Full CPU suite **184 passed, 1 skipped**; CUDA environment **185 passed**. Existing benchmark checkpoint hashes are unchanged.

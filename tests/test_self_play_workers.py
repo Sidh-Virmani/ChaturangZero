@@ -73,7 +73,7 @@ def test_worker_timeout_cleans_up_children(tmp_path):
     children = {process.pid for process in mp.active_children()}
     with pytest.raises(TimeoutError, match='not committed'):
         trainer.run()
-    assert not (tmp_path / 'training_state.pt').exists()
+    assert Trainer.resume(tmp_path, 1).completed_iterations == 0
     assert {process.pid for process in mp.active_children()} == children
 
 
