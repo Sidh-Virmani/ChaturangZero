@@ -1,0 +1,308 @@
+{
+  "schema_version": 1,
+  "benchmark": "phase_0_baseline",
+  "created_at_utc": "2026-11-15T08:58:30.667919+00:00",
+  "system": {
+    "platform": "Windows-11-10.0.26300-SP0",
+    "processor": "AMD64 Family 25 Model 116 Stepping 1, AuthenticAMD",
+    "python": "3.13.1",
+    "python_executable": "C:\\Users\\Sidh\\Desktop\\Sidh\\CS\\Projects\\ChaturangZero\\.venv\\Scripts\\python.exe",
+    "numpy": "2.5.3",
+    "torch": "2.14.0+cpu",
+    "device": "cpu",
+    "device_name": "CPU",
+    "cuda_available": false,
+    "torch_num_threads": 8,
+    "torch_num_interop_threads": 8
+  },
+  "git": {
+    "commit": "08916ceb78efbf1dc9ed0b713bc1c5831e8e499c",
+    "branch": "main",
+    "dirty": false
+  },
+  "checkpoint": {
+    "path": "C:\\Users\\Sidh\\Desktop\\Sidh\\CS\\Projects\\ChaturangZero\\checkpoints\\benchmark\\hard.pt",
+    "sha256": "adbbb5332453ab95909b0775c34592678ff2cd8b663c9176aa79abe9b868acf4",
+    "size_bytes": 3391121,
+    "model_config": {
+      "channels": 64,
+      "residual_blocks": 4,
+      "policy_channels": 2,
+      "value_hidden": 128
+    },
+    "trainable_parameters": 840583
+  },
+  "configuration": {
+    "checkpoint": "checkpoints\\benchmark\\hard.pt",
+    "device": "cpu",
+    "seed": 20261105,
+    "batch_sizes": [
+      1,
+      16,
+      64
+    ],
+    "core_warmups": 5,
+    "core_rounds": 5,
+    "core_iterations": 100,
+    "encoding_iterations": 1000,
+    "inference_warmups": 5,
+    "inference_rounds": 5,
+    "inference_iterations": 30,
+    "evaluator_warmups": 2,
+    "evaluator_rounds": 3,
+    "evaluator_iterations": 5,
+    "mcts_simulations": [
+      5,
+      10,
+      25
+    ],
+    "mcts_warmups": 1,
+    "mcts_repeats": 3,
+    "self_play_simulations": 5,
+    "self_play_plies": 4,
+    "self_play_repeats": 2,
+    "training_batch_size": 64,
+    "training_warmups": 2,
+    "training_rounds": 3,
+    "training_steps_per_round": 10
+  },
+  "workload": {
+    "positions": [
+      {
+        "name": "initial",
+        "ply_count": 0,
+        "side_to_move": "white",
+        "piece_count": 32,
+        "legal_moves": 16
+      },
+      {
+        "name": "midgame_10_ply",
+        "ply_count": 10,
+        "side_to_move": "white",
+        "piece_count": 32,
+        "legal_moves": 27
+      },
+      {
+        "name": "simple_endgame",
+        "ply_count": 0,
+        "side_to_move": "white",
+        "piece_count": 6,
+        "legal_moves": 17
+      }
+    ],
+    "mcts_position": "initial",
+    "self_play_start_position": "initial"
+  },
+  "metrics": [
+    {
+      "name": "legal_moves",
+      "category": "game_and_representation",
+      "value": 2.8665326667639115,
+      "unit": "ms/state",
+      "samples": 5,
+      "minimum": 1.7726020000797387,
+      "maximum": 2.930283333407715,
+      "details": {}
+    },
+    {
+      "name": "terminal_status",
+      "category": "game_and_representation",
+      "value": 2.9193603332775333,
+      "unit": "ms/state",
+      "samples": 5,
+      "minimum": 2.8851726666713753,
+      "maximum": 2.939640333255132,
+      "details": {}
+    },
+    {
+      "name": "legal_action_mask",
+      "category": "game_and_representation",
+      "value": 3.2161773333791643,
+      "unit": "ms/state",
+      "samples": 5,
+      "minimum": 2.9302056665377068,
+      "maximum": 3.24567566664579,
+      "details": {}
+    },
+    {
+      "name": "encode_state",
+      "category": "game_and_representation",
+      "value": 0.010252066674487043,
+      "unit": "ms/state",
+      "samples": 5,
+      "minimum": 0.00898673334935059,
+      "maximum": 0.013168266683351249,
+      "details": {}
+    },
+    {
+      "name": "raw_network_batch_1",
+      "category": "network",
+      "value": 1.606413332046941,
+      "unit": "ms/state",
+      "samples": 5,
+      "minimum": 1.3608466659206897,
+      "maximum": 1.7334499997862927,
+      "details": {
+        "batch_size": 1,
+        "median_ms_per_batch": 1.606413332046941,
+        "states_per_second": 622.5047937854011
+      }
+    },
+    {
+      "name": "raw_network_batch_16",
+      "category": "network",
+      "value": 0.29890604164393153,
+      "unit": "ms/state",
+      "samples": 5,
+      "minimum": 0.29166270833229646,
+      "maximum": 0.32277187492582016,
+      "details": {
+        "batch_size": 16,
+        "median_ms_per_batch": 4.7824966663029045,
+        "states_per_second": 3345.5329122829803
+      }
+    },
+    {
+      "name": "raw_network_batch_64",
+      "category": "network",
+      "value": 0.17558062500029337,
+      "unit": "ms/state",
+      "samples": 5,
+      "minimum": 0.1652485416646717,
+      "maximum": 0.18867567708487817,
+      "details": {
+        "batch_size": 64,
+        "median_ms_per_batch": 11.237160000018775,
+        "states_per_second": 5695.389226449838
+      }
+    },
+    {
+      "name": "complete_evaluator_batch_1",
+      "category": "evaluator",
+      "value": 5.303099995944649,
+      "unit": "ms/state",
+      "samples": 3,
+      "minimum": 5.268980003893375,
+      "maximum": 5.698420002590865,
+      "details": {
+        "batch_size": 1,
+        "median_ms_per_batch": 5.303099995944649,
+        "states_per_second": 188.5689503808552
+      }
+    },
+    {
+      "name": "complete_evaluator_batch_16",
+      "category": "evaluator",
+      "value": 3.9278562500840053,
+      "unit": "ms/state",
+      "samples": 3,
+      "minimum": 3.8354475000232924,
+      "maximum": 3.950378749868833,
+      "details": {
+        "batch_size": 16,
+        "median_ms_per_batch": 62.845700001344085,
+        "states_per_second": 254.5918018202965
+      }
+    },
+    {
+      "name": "complete_evaluator_batch_64",
+      "category": "evaluator",
+      "value": 3.6633796875321423,
+      "unit": "ms/state",
+      "samples": 3,
+      "minimum": 3.65120218739321,
+      "maximum": 3.8553906249944703,
+      "details": {
+        "batch_size": 64,
+        "median_ms_per_batch": 234.4563000020571,
+        "states_per_second": 272.971978144492
+      }
+    },
+    {
+      "name": "mcts_5_simulations",
+      "category": "mcts",
+      "value": 0.036059899954125285,
+      "unit": "seconds/search",
+      "samples": 3,
+      "minimum": 0.03593970002839342,
+      "maximum": 0.03689190000295639,
+      "details": {
+        "simulations": 5,
+        "simulations_per_second": 138.65817726507572,
+        "temperature": 0.0,
+        "dirichlet_noise": false,
+        "fresh_tree_each_sample": true
+      }
+    },
+    {
+      "name": "mcts_10_simulations",
+      "category": "mcts",
+      "value": 0.06181370001286268,
+      "unit": "seconds/search",
+      "samples": 3,
+      "minimum": 0.060017500014510006,
+      "maximum": 0.06548009999096394,
+      "details": {
+        "simulations": 10,
+        "simulations_per_second": 161.7764346402031,
+        "temperature": 0.0,
+        "dirichlet_noise": false,
+        "fresh_tree_each_sample": true
+      }
+    },
+    {
+      "name": "mcts_25_simulations",
+      "category": "mcts",
+      "value": 0.15397879999363795,
+      "unit": "seconds/search",
+      "samples": 3,
+      "minimum": 0.15248789999168366,
+      "maximum": 0.1554005999932997,
+      "details": {
+        "simulations": 25,
+        "simulations_per_second": 162.36001320333023,
+        "temperature": 0.0,
+        "dirichlet_noise": false,
+        "fresh_tree_each_sample": true
+      }
+    },
+    {
+      "name": "short_self_play",
+      "category": "self_play",
+      "value": 22.74198857524084,
+      "unit": "plies/second",
+      "samples": 2,
+      "minimum": 22.499579534596204,
+      "maximum": 22.98439761588547,
+      "details": {
+        "simulations_per_move": 5,
+        "requested_plies_per_sample": 4,
+        "completed_plies_per_sample": [
+          4,
+          4
+        ],
+        "temperature": 0.0,
+        "dirichlet_noise": false,
+        "subtree_reuse": true
+      }
+    },
+    {
+      "name": "cpu_training_step",
+      "category": "training",
+      "value": 22.955333969681682,
+      "unit": "steps/second",
+      "samples": 3,
+      "minimum": 22.803909412217344,
+      "maximum": 23.222465414111365,
+      "details": {
+        "batch_size": 64,
+        "median_ms_per_step": 43.5628600011114,
+        "optimizer": "AdamW",
+        "learning_rate": 0.001,
+        "weight_decay": 0.0001,
+        "gradient_clip_norm": 1.0,
+        "model_copy_discarded": true
+      }
+    }
+  ]
+}

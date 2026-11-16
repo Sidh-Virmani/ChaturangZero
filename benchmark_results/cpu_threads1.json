@@ -1,0 +1,80 @@
+{
+  "config": {
+    "mode": "network",
+    "checkpoint": "checkpoints\\benchmark\\hard.pt",
+    "output": "benchmark_results\\cpu_threads1.json",
+    "device": "cpu",
+    "threads": 1,
+    "workers": 1,
+    "games": 4,
+    "simulations": 25,
+    "max_plies": 512,
+    "seed": 20261115
+  },
+  "environment": {
+    "git_commit": "08916ceb78efbf1dc9ed0b713bc1c5831e8e499c",
+    "git_status": "M .gitignore\n?? benchmark_results/throughput_before.json\n?? benchmarks/throughput.py",
+    "ai_source_sha256": "d8482260c466f6bd6496efc8e7540e05afe5b9454512d5feb4333cbe8a275d75",
+    "python": "3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "torch": "2.14.0+cpu",
+    "numpy": "2.5.3",
+    "device": "cpu",
+    "torch_threads": 1,
+    "torch_interop_threads": 8,
+    "deterministic_algorithms": false
+  },
+  "checkpoint_sha256": "adbbb5332453ab95909b0775c34592678ff2cd8b663c9176aa79abe9b868acf4",
+  "network": [
+    {
+      "batch": 1,
+      "inference_ms": 1.981930001056753,
+      "inference_states_per_second": 504.55868747473727
+    },
+    {
+      "batch": 16,
+      "inference_ms": 10.704194998834282,
+      "inference_states_per_second": 1494.7410806457137,
+      "training_ms": 43.72561000054702,
+      "training_examples_per_second": 365.9182799233638
+    },
+    {
+      "batch": 64,
+      "inference_ms": 33.54490000056103,
+      "inference_states_per_second": 1907.8906182140838,
+      "training_ms": 129.30495999753475,
+      "training_examples_per_second": 494.95394454489747
+    },
+    {
+      "batch": 128,
+      "inference_ms": 63.83654499950353,
+      "inference_states_per_second": 2005.1210478417258,
+      "training_ms": 246.7210899980273,
+      "training_examples_per_second": 518.8044524325968
+    },
+    {
+      "batch": 256,
+      "inference_ms": 147.1236300014425,
+      "inference_states_per_second": 1740.0331951943408,
+      "training_ms": 552.3066699970514,
+      "training_examples_per_second": 463.5106072526097
+    }
+  ],
+  "search": [
+    {
+      "simulations": 25,
+      "seconds": 0.16946715000085533,
+      "simulations_per_second": 147.52121576290048
+    },
+    {
+      "simulations": 50,
+      "seconds": 0.32196505001047626,
+      "simulations_per_second": 155.2963590252205
+    },
+    {
+      "simulations": 100,
+      "seconds": 0.6305976000148803,
+      "simulations_per_second": 158.579734521096
+    }
+  ]
+}

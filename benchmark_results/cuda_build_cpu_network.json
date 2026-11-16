@@ -1,0 +1,80 @@
+{
+  "config": {
+    "mode": "network",
+    "checkpoint": "checkpoints\\benchmark\\hard.pt",
+    "output": "benchmark_results\\cuda_build_cpu_network.json",
+    "device": "cpu",
+    "threads": 8,
+    "workers": 1,
+    "games": 4,
+    "simulations": 25,
+    "max_plies": 512,
+    "seed": 20261115
+  },
+  "environment": {
+    "git_commit": "08916ceb78efbf1dc9ed0b713bc1c5831e8e499c",
+    "git_status": "M .gitignore\n M p4_training/__main__.py\n M p4_training/config.py\n M p4_training/self_play.py\n M p4_training/trainer.py\n M tests/test_training_schedule.py\n?? benchmark_results/cpu_threads1.json\n?? benchmark_results/cuda_network.json\n?? benchmark_results/selfplay_w1_25.json\n?? benchmark_results/selfplay_w1_25_repeat.json\n?? benchmark_results/selfplay_w2_25.json\n?? benchmark_results/selfplay_w4_25.json\n?? benchmark_results/throughput_before.json\n?? benchmarks/throughput.py\n?? p4_training/workers.py\n?? requirements-cuda.txt\n?? tests/test_self_play_workers.py",
+    "ai_source_sha256": "d07b6983e5cf17616c8fce875623139ee69c4ebad25ac076970e81f884d52aa1",
+    "python": "3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "torch": "2.11.0+cu128",
+    "numpy": "2.5.3",
+    "device": "cpu",
+    "torch_threads": 8,
+    "torch_interop_threads": 8,
+    "deterministic_algorithms": false
+  },
+  "checkpoint_sha256": "adbbb5332453ab95909b0775c34592678ff2cd8b663c9176aa79abe9b868acf4",
+  "network": [
+    {
+      "batch": 1,
+      "inference_ms": 0.7556149997981265,
+      "inference_states_per_second": 1323.4252896874261
+    },
+    {
+      "batch": 16,
+      "inference_ms": 2.368469999055378,
+      "inference_states_per_second": 6755.4159463203305,
+      "training_ms": 12.788819998968393,
+      "training_examples_per_second": 1251.0927514259047
+    },
+    {
+      "batch": 64,
+      "inference_ms": 5.666010000277311,
+      "inference_states_per_second": 11295.426587116448,
+      "training_ms": 24.843410000903532,
+      "training_examples_per_second": 2576.135884633888
+    },
+    {
+      "batch": 128,
+      "inference_ms": 9.681654997984879,
+      "inference_states_per_second": 13220.880110543258,
+      "training_ms": 42.00227000401355,
+      "training_examples_per_second": 3047.4543396766144
+    },
+    {
+      "batch": 256,
+      "inference_ms": 18.58765500073787,
+      "inference_states_per_second": 13772.581855529255,
+      "training_ms": 83.2158499979414,
+      "training_examples_per_second": 3076.3370200068007
+    }
+  ],
+  "search": [
+    {
+      "simulations": 25,
+      "seconds": 0.07461645000148565,
+      "simulations_per_second": 335.0467624699679
+    },
+    {
+      "simulations": 50,
+      "seconds": 0.15789309999672696,
+      "simulations_per_second": 316.66994948504066
+    },
+    {
+      "simulations": 100,
+      "seconds": 0.2923431499802973,
+      "simulations_per_second": 342.06376994548896
+    }
+  ]
+}

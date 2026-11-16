@@ -3,6 +3,7 @@ ChaturangZero_AI_Project_Proposal.docx
 
 # Python environment
 .venv/
+.venv-cuda/
 venv/
 
 # Python cache

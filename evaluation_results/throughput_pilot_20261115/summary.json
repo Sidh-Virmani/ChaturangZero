@@ -1,0 +1,33 @@
+{
+  "games": 4,
+  "wins": 0,
+  "losses": 0,
+  "draws": 3,
+  "truncations": 1,
+  "completed_games": 3,
+  "completed_game_score": 0.5,
+  "all_game_score_bounds": [
+    0.375,
+    0.625
+  ],
+  "average_plies": 64.25,
+  "terminal_reasons": {
+    "repetition": 3
+  },
+  "pairs": [
+    {
+      "opening_id": "initial",
+      "games": 2,
+      "resolved": true,
+      "candidate_score": 0.5
+    },
+    {
+      "opening_id": "opening-001",
+      "games": 2,
+      "resolved": false,
+      "candidate_score": null
+    }
+  ],
+  "statistics_note": "Fixed-suite descriptive results. Bounds account for unresolved truncations, not statistical uncertainty. Paired games are not independent samples; no IID confidence interval or Elo is claimed.",
+  "elapsed_seconds": 11.181079100002535
+}
