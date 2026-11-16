@@ -1,5 +1,11 @@
 # P4 training: teaching ChaturangZero from its own games
 
+For measured worker/thread/CUDA choices, pilot results, checkpoint snapshots and
+the proposed serious-run command, see [Throughput and pilot](throughput_and_pilot.md).
+New runs support seeded CPU self-play workers independently of the training
+device. Existing checkpoints keep their saved serial stream. The default model,
+rules, action IDs, outcome perspective and data-scaled update budget are unchanged.
+
 ## 1. Why P4 exists
 
 The earlier folders each solve one part of the problem. `shared/game_core` knows which moves are legal and when a game has ended. P1 turns a position and a move into fixed numbers. P2 contains a neural network that can score moves and estimate a position. P3 searches ahead with that network.

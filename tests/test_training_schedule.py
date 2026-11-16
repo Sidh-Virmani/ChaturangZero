@@ -105,7 +105,7 @@ def test_cli_schedule_selection(tmp_path, monkeypatch):
         def __init__(self, config):
             self.config = config
             recorded.append(config)
-        def run(self):
+        def run(self, **kwargs):
             return ()
     monkeypatch.setattr(cli, 'Trainer', CaptureTrainer)
     for options in ([], ['--training-passes', '2'], ['--training-steps', '7']):

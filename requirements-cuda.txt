@@ -1,0 +1,6 @@
+# Install with the project's normal Python 3.13 interpreter in .venv-cuda.
+# CPU environment .venv is intentionally left unchanged.
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.11.0+cu128
+numpy==2.5.3
+pytest==8.4.2

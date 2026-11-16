@@ -30,6 +30,13 @@ class TrainingConfig:
     model: ModelConfig = field(default_factory=ModelConfig)
     symmetry_probability: float = 0.5
     training_passes: float | None = None
+    self_play_workers: int = 1
+    worker_threads: int = 1
+    cpu_threads: int = 8
+    self_play_device: str = 'cpu'
+    seeded_games: bool = True
+    worker_timeout_seconds: int = 3600
+    snapshot_interval: int = 0
 
     def __post_init__(self) -> None:
         if self.training_steps is not None and self.training_passes is not None:
@@ -54,11 +61,18 @@ class TrainingConfig:
             raise ValueError("symmetry_probability must be between 0 and 1")
         for name in (
             "iterations", "games_per_iteration", "simulations_per_move",
-            "max_game_plies", "batch_size", "replay_capacity",
+            "max_game_plies", "batch_size", "replay_capacity", 'self_play_workers',
+            'worker_threads', 'cpu_threads', 'worker_timeout_seconds',
         ):
             value = getattr(self, name)
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
                 raise ValueError(f"{name} must be a positive integer")
+        if not isinstance(self.seeded_games, bool):
+            raise ValueError('seeded_games must be boolean')
+        if self.self_play_workers > 1 and (not self.seeded_games or self.self_play_device != 'cpu'):
+            raise ValueError('Parallel self-play requires seeded_games and CPU workers')
+        if not isinstance(self.snapshot_interval, int) or isinstance(self.snapshot_interval, bool) or self.snapshot_interval < 0:
+            raise ValueError('snapshot_interval must be a non-negative integer')
         if (
             not isinstance(self.opening_temperature_plies, int)
             or isinstance(self.opening_temperature_plies, bool)

@@ -45,6 +45,8 @@ def provenance(device: str) -> dict:
         'device': str(device), 'torch_threads': torch.get_num_threads(),
         'torch_interop_threads': torch.get_num_interop_threads(),
         'deterministic_algorithms': torch.are_deterministic_algorithms_enabled(),
+        'cuda_runtime': torch.version.cuda,
+        'gpu_name': torch.cuda.get_device_name(device) if str(device).startswith('cuda') else None,
     }
 
 

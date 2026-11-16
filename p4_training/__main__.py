@@ -131,10 +131,11 @@ def main() -> None:
         metrics = ()
     elif args.command == "resume":
         trainer = Trainer.resume(args.output, args.iterations, args.device)
-        metrics = trainer.run()
+        trainer.run(on_game=_print_game, on_iteration=_print_iteration, on_wait=_print_wait)
+        metrics = ()
     else:
-        if (args.output / "training_state.pt").exists():
-            parser.error("training_state.pt already exists; use resume or a new --output")
+        if args.output.exists() and any(args.output.iterdir()):
+            parser.error("Output directory is not empty; use resume or a new --output")
         if args.command == "smoke":
             config = TrainingConfig.smoke(args.output)
             config = replace(config, symmetry_probability=args.symmetry_probability)
@@ -147,7 +148,8 @@ def main() -> None:
         else:
             config = _training_config(args, iterations=args.iterations)
             trainer = Trainer(config)
-            metrics = trainer.run()
+            trainer.run(on_game=_print_game, on_iteration=_print_iteration, on_wait=_print_wait)
+            metrics = ()
 
     for item in metrics:
         print(_metrics_json(item))
@@ -178,6 +180,13 @@ def _add_training_arguments(parser: argparse.ArgumentParser, *, default_output: 
     parser.add_argument("--channels", type=int, default=64)
     parser.add_argument("--blocks", type=int, default=4)
     parser.add_argument("--symmetry-probability", type=float, default=0.5)
+    parser.add_argument('--self-play-workers', type=int, default=1)
+    parser.add_argument('--worker-threads', type=int, default=1)
+    parser.add_argument('--cpu-threads', type=int, default=8)
+    parser.add_argument('--self-play-device', default='cpu')
+    parser.add_argument('--worker-timeout-seconds', type=int, default=3600)
+    parser.add_argument('--snapshot-interval', type=int, default=0,
+                        help='Keep an immutable iteration checkpoint every N iterations; 0 disables')
 
 
 def _training_config(args: argparse.Namespace, *, iterations: int) -> TrainingConfig:
@@ -198,6 +207,9 @@ def _training_config(args: argparse.Namespace, *, iterations: int) -> TrainingCo
         checkpoint_dir=args.output,
         model=ModelConfig(channels=args.channels, residual_blocks=args.blocks),
         symmetry_probability=args.symmetry_probability,
+        self_play_workers=args.self_play_workers, worker_threads=args.worker_threads,
+        cpu_threads=args.cpu_threads, self_play_device=args.self_play_device,
+        worker_timeout_seconds=args.worker_timeout_seconds, snapshot_interval=args.snapshot_interval,
     )
 
 
@@ -217,6 +229,19 @@ def _metrics_json(metrics) -> str:
     fields = asdict(metrics)
     fields.pop('audit', None)  # Full provenance lives in metrics.jsonl, not console noise.
     return json.dumps(fields)
+
+
+def _print_game(index, game):
+    reason = game.outcome.reason.value if game.outcome else 'truncation'
+    print(f'game={index + 1} plies={game.plies} examples={len(game.examples)} result={reason}', flush=True)
+
+
+def _print_iteration(metrics):
+    print(_metrics_json(metrics), flush=True)
+
+
+def _print_wait():
+    print('Self-play workers are still searching...', flush=True)
 
 
 def _format_duration(seconds: float) -> str:

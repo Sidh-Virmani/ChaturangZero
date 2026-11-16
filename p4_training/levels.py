@@ -44,7 +44,7 @@ def train_levels(
     if state_path.exists():
         trainer = Trainer.resume(output, iterations=1, device=config.device)
     else:
-        existing = [output / f"{name}.pt" for name in milestones.values() if (output / f"{name}.pt").exists()]
+        existing = list(output.glob('*.pt'))
         if existing:
             names = ", ".join(path.name for path in existing)
             raise FileExistsError(

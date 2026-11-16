@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from time import perf_counter, process_time
 
 import numpy as np
 
@@ -23,6 +24,11 @@ class SelfPlayResult:
     examples: tuple[TrainingExample, ...]
     outcome: Outcome | None
     plies: int
+    moves: tuple[str, ...] = ()
+    mean_policy_entropy: float = 0.0
+    mean_visited_actions: float = 0.0
+    elapsed_seconds: float = field(default=0.0, compare=False)
+    cpu_seconds: float = field(default=0.0, compare=False)
 
     @property
     def truncated(self) -> bool:
@@ -47,6 +53,9 @@ def play_game(
 ) -> SelfPlayResult:
     """Play one game; omit examples if the core has no result by the ply cap."""
     state = initial_state() if start_state is None else start_state
+    started, cpu_started = perf_counter(), process_time()
+    played_moves: list[str] = []
+    entropy_sum = visited_sum = 0.0
     search = MCTS(
         evaluator,
         MCTSConfig(
@@ -58,18 +67,25 @@ def play_game(
     pending: list[tuple[np.ndarray, np.ndarray, np.ndarray, Side]] = []
     plies = 0
 
+    def finish(outcome):
+        examples = tuple(
+            TrainingExample(board, actions, probabilities, float(outcome.reward(side)))
+            for board, actions, probabilities, side in pending
+        ) if outcome is not None else ()
+        return SelfPlayResult(examples, outcome, plies, tuple(played_moves),
+            entropy_sum / plies if plies else 0., visited_sum / plies if plies else 0.,
+            perf_counter() - started, process_time() - cpu_started)
+
     while plies < config.max_game_plies:
         outcome = terminal_status(state)
         if outcome.terminal:
-            examples = tuple(
-                TrainingExample(board, actions, probabilities, float(outcome.reward(side)))
-                for board, actions, probabilities, side in pending
-            )
-            return SelfPlayResult(examples, outcome, plies)
+            return finish(outcome)
 
         policy, sampled_move, _ = search.search(state)
         actions = np.flatnonzero(policy).astype(np.int16)
         probabilities = policy[actions].astype(np.float32, copy=True)
+        entropy_sum += float(-np.sum(probabilities * np.log(probabilities)))
+        visited_sum += len(actions)
         pending.append((encode_state(state).astype(np.uint8), actions, probabilities, state.side_to_move))
 
         move = (
@@ -78,13 +94,10 @@ def play_game(
         )
         state = apply_move(state, move)
         search.step(move)
+        played_moves.append(move.uci)
         plies += 1
 
     outcome = terminal_status(state)
     if outcome.terminal:
-        examples = tuple(
-            TrainingExample(board, actions, probabilities, float(outcome.reward(side)))
-            for board, actions, probabilities, side in pending
-        )
-        return SelfPlayResult(examples, outcome, plies)
-    return SelfPlayResult((), None, plies)
+        return finish(outcome)
+    return finish(None)

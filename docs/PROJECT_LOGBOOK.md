@@ -261,3 +261,10 @@ Use this format:
 **Why:** Repeating deterministic games from one board overstated the amount of evidence, while training history was difficult to inspect outside checkpoints.
 **Result:** Three preliminary six-game comparisons of Hard against Easy, Medium and a fixed untrained model produced 11 repetition draws and 7 truncations, with no decisive games; this does not establish a strength ranking. All 18 exported games passed core replay verification, and smoke/resume logs preserved the zero-new-data/zero-update rule.
 **Tests:** 165 passed. Existing benchmark checkpoint hashes are unchanged; no long training run was started.
+
+## 2026-11-15 — Measured parallel self-play and CUDA training
+
+**Changed:** Added seeded CPU self-play workers, thread controls, failure cleanup and permanent iteration snapshots; enabled CUDA in a separate pinned environment.
+**Why:** Independent games can use more CPU cores while batched network updates benefit from the RTX 4060. One thread per worker avoided oversubscription.
+**Result:** Matched four-game workload improved **71.1 → 26.4 s** with four workers (2.69×); six workers beat four by another 21% on six games. CUDA batch-128 updates were **42.0 → 6.0 ms** versus CPU on the same build. A resumed 12-game pilot at 50 simulations retained **2,623 examples**, approximately **295 games/hour / 64,500 examples/hour** over its short compute window; these are extrapolations, not sustained-run guarantees.
+**Decision:** Recommend six CPU workers/one thread each and CUDA batch-128 training. Fifty simulations supplied decisive targets where the small frozen-model 25-simulation sample only drew; 100 cost more and truncated more. Tiny pilot evaluation established no strength gain. CPU tests: **178 passed, 1 skipped**; CUDA environment: **179 passed**. No serious run started; existing benchmark hashes are unchanged.

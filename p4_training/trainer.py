@@ -9,6 +9,7 @@ from pathlib import Path
 from random import Random
 import math
 from time import perf_counter
+from typing import Callable
 
 import numpy as np
 import torch
@@ -25,6 +26,7 @@ from .augmentation import augment_example
 from .data import ReplayBuffer
 from .self_play import play_game
 from .recording import atomic_text, file_sha256, json_text, provenance
+from .workers import generate_games, game_record
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +59,9 @@ class Trainer:
     def __init__(self, config: TrainingConfig) -> None:
         self.config = config
         self.device = torch.device(config.device)
+        if self.device.type == 'cuda' and not torch.cuda.is_available():
+            raise ValueError('CUDA is unavailable; use --device cpu or the documented CUDA environment')
+        torch.set_num_threads(config.cpu_threads)
         np.random.seed(config.seed)  # P3 uses NumPy's module-level RNG.
         torch.manual_seed(config.seed)
         self.sample_rng = Random(config.seed)
@@ -73,15 +78,19 @@ class Trainer:
         self.history: list[IterationMetrics] = []
         self.environment = provenance(config.device)
 
-    def run(self, start_state: GameState | None = None) -> tuple[IterationMetrics, ...]:
+    def run(self, start_state: GameState | None = None, *,
+            on_game: Callable | None = None, on_iteration: Callable | None = None,
+            on_wait: Callable | None = None) -> tuple[IterationMetrics, ...]:
         """Run ``config.iterations`` more cycles and checkpoint after each one."""
         new_metrics: list[IterationMetrics] = []
         for _ in range(self.config.iterations):
             started = perf_counter()
-            game_results = [
-                play_game(self.evaluator, self.config, start_state)
-                for _ in range(self.config.games_per_iteration)
-            ]
+            if self.config.seeded_games:
+                game_results = generate_games(self.model, self.config,
+                    self.completed_iterations + 1, start_state, on_game, on_wait)
+            else:  # Preserve old checkpoints' serial NumPy stream.
+                game_results = [play_game(self.evaluator, self.config, start_state)
+                                for _ in range(self.config.games_per_iteration)]
             for game in game_results:
                 self.replay.add_game(game.examples)
 
@@ -118,11 +127,18 @@ class Trainer:
                     'config': {**asdict(self.config), 'checkpoint_dir': str(self.config.checkpoint_dir)},
                     'start_state': json.loads(json.dumps(asdict(start_state))) if start_state is not None else 'initial',
                     'learning_rates': [group['lr'] for group in self.optimizer.param_groups],
+                    'self_play_seed_protocol': 'iteration-game-v1' if self.config.seeded_games else 'legacy-stream',
+                    'games': [game_record(game, self.config, self.completed_iterations, i)
+                              for i, game in enumerate(game_results)],
+                    'unique_encoded_positions': len({example.state.tobytes()
+                        for game in game_results for example in game.examples}),
                 },
             )
             self.history.append(metrics)
             self.save()
             new_metrics.append(self.history[-1])
+            if on_iteration:
+                on_iteration(self.history[-1])
         return tuple(new_metrics)
 
     def update_count(self, new_examples: int) -> int:
@@ -208,6 +224,10 @@ class Trainer:
         state_temp = directory / "training_state.tmp"
         torch.save(payload, state_temp)
         state_temp.replace(directory / "training_state.pt")
+        if self.config.snapshot_interval and self.completed_iterations % self.config.snapshot_interval == 0:
+            from .levels import _copy_without_overwrite
+            _copy_without_overwrite(directory / 'latest_model.pt',
+                                    directory / f'iteration_{self.completed_iterations:06d}.pt')
         # The committed resume checkpoint is authoritative. Rebuild its small
         # history view atomically, rather than appending duplicate/stale rows on resume.
         atomic_text(directory / 'metrics.jsonl', ''.join(
@@ -237,6 +257,9 @@ class Trainer:
             raise ValueError("Checkpoint is incompatible with the current P1/P4 format")
 
         config_data = dict(saved["config"])
+        config_data.setdefault('seeded_games', False)
+        config_data.setdefault('self_play_device', device)
+        config_data.setdefault('cpu_threads', torch.get_num_threads())
         if "training_passes" not in config_data:
             # Old configs always included a default step count. Migrate to
             # data-scaled work so zero-data iterations do not fit stale replay.
