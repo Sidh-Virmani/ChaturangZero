@@ -209,6 +209,8 @@ class GameSession:
                 progress["totalSimulations"] = data["totalSimulations"]
             if "simulationsCompleted" in data:
                 progress["simulationsCompleted"] = data["simulationsCompleted"]
+            if 'searchElapsedSeconds' in data:
+                progress['searchElapsedSeconds'] = data['searchElapsedSeconds']
             messages = {
                 "state": "Reading the current board State...",
                 "legal": f"Found {progress['legalActionCount']} Legal Actions.",
@@ -284,6 +286,9 @@ class GameSession:
             "checkpointLabel": self.machine.label if self.mode == "machine" and self.machine else None,
             "smokeCheckpoint": self.machine.is_smoke if self.mode == "machine" and self.machine else False,
             "analysis": self.analysis,
+            "engine": getattr(self.machine, 'engine_info', None) if self.mode == 'machine' else None,
+            "repetition": {'occurrences': 1 + state.position_history.count((state.board, state.side_to_move)),
+                           'drawAt': 3} if self.mode == 'machine' else None,
         }
 
 

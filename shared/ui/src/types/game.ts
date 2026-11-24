@@ -56,6 +56,9 @@ export interface AnalyzedAction {
 }
 
 export interface MachineAnalysis {
+  searchElapsedSeconds: number
+  simulationsPerSecond: number
+  pipelineElapsedSeconds: number
   checkpoint: string
   smokeCheckpoint: boolean
   sideToMove: Side
@@ -71,6 +74,7 @@ export interface MachineAnalysis {
 }
 
 export interface MachineProgress {
+  searchElapsedSeconds?: number
   phase: string
   events: string[]
   legalActionCount: number | null
@@ -81,6 +85,25 @@ export interface MachineProgress {
 }
 
 export interface BoardState {
+  engine?: {
+    checkpoint: string
+    sha256: string
+    inferenceDevice: string
+    simulations: number
+    cPuct: number
+    model: { channels: number; residual_blocks: number }
+    training: {
+      iteration: number
+      selfPlaySimulations?: number | null
+      workers?: number | null
+      replayCapacity?: number | null
+      symmetryProbability?: number | null
+      device?: string | null
+      gitCommit?: string | null
+      source: string
+    } | null
+  } | null
+  repetition?: { occurrences: number; drawAt: number } | null
   pieces: Piece[]
   currentTurn: Side
   selectableSquares: SquareId[]

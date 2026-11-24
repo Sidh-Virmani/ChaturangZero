@@ -53,6 +53,14 @@ def test_machine_search_uses_legal_core_moves_and_real_root_statistics(machine):
     )
     assert analysis["legalActionCount"] == int(legal_action_mask(before_search).sum())
     assert analysis["rootVisits"] == analysis["simulations"] == 3
+    assert analysis['searchElapsedSeconds'] > 0
+    assert analysis['simulationsPerSecond'] == pytest.approx(3 / analysis['searchElapsedSeconds'])
+    assert analysis['pipelineElapsedSeconds'] >= analysis['searchElapsedSeconds']
+    assert progress['searchElapsedSeconds'] >= analysis['searchElapsedSeconds']
+    assert result['engine']['simulations'] == 3
+    assert len(result['engine']['sha256']) == 64
+    assert result['engine']['training'] is None
+    assert result['repetition'] == {'occurrences': 1, 'drawAt': 3}
     assert -1 <= analysis["value"] <= 1
     assert all(0 <= item["prior"] <= 1 for item in analysis["policyPriors"])
     assert all(item["visits"] >= 0 for item in analysis["candidates"])
@@ -94,6 +102,8 @@ def test_http_machine_move_returns_analysis_and_rejects_out_of_turn_human_move(m
         assert progress["done"] is True
         assert progress["simulationsCompleted"] == result["analysis"]["simulations"]
         assert post("/api/game/reset", {"mode": "human"})["analysis"] is None
+        assert Handler.session.state_dict()['engine'] is None
+        assert Handler.session.state_dict()['repetition'] is None
     finally:
         server.shutdown()
         server.server_close()

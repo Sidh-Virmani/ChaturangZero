@@ -91,7 +91,7 @@ function App() {
         } catch {
           // The move request reports connection errors; a missed progress poll is harmless.
         }
-        await new Promise((resolve) => window.setTimeout(resolve, 160))
+        await new Promise((resolve) => window.setTimeout(resolve, 75))
       }
     }
     try {

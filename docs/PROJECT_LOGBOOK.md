@@ -275,3 +275,10 @@ Use this format:
 **Why:** Interrupting iteration 1 previously had no saved restart point, and resuming with additional iterations could accidentally extend the planned run.
 **Result:** Tiny tests recover initial weights after first-game interruption, reject a second writer, and verify that repeating an already-completed target performs no updates. The serious run was not launched; the operational runbook is `docs/SERIOUS_TRAINING.md`.
 **Tests:** Full CPU suite **184 passed, 1 skipped**; CUDA environment **185 passed**. Existing benchmark checkpoint hashes are unchanged.
+
+## 2026-11-24 — Demo observability in the green game client
+
+**Changed:** Machine Analysis now shows checkpoint identity and hash-matched training provenance, the legal-actions/network/MCTS pipeline, real simulation progress and search timings, candidate priors versus visits, and current repetition occurrence.
+**Why:** A normal Human vs Machine recording can now explain the actual trained/search pipeline without terminal windows or unsupported strength claims.
+**Result:** Live iteration-200/50-simulation API validation observed progress 0 → 16 → 41 → completion, 50 root visits and a legal reply; search took 0.212 s in that run. Timing is measured per search, never a recorded benchmark substituted for the current move. Frontend build and API/core regressions pass; browser visual inspection was blocked by unavailable browser access.
+**Tests:** CPU **187 passed, 1 skipped**; CUDA **188 passed**. No weights, rules, search policy or training results changed.

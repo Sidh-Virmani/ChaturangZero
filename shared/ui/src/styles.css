@@ -208,6 +208,31 @@ button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 
 .ai-console__section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 10px; color: #e9d3a3; font-weight: 700; }
 .ai-console__section-title small { color: #93a193; font-size: 10px; font-weight: 400; }
 .ai-console__candidates { display: grid; gap: 12px; margin-bottom: 17px; }
+.ai-engine { margin: -2px 0 12px; color: #b9c7b7; font-size: 11px; }
+.ai-engine__identity { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ai-engine__identity strong { color: #eddfc1; font-weight: 600; }
+.ai-engine code { color: #99aa97; font-size: 10px; }
+.ai-engine p { margin: 5px 0 8px; }
+.ai-engine summary { cursor: pointer; color: #cbb88e; padding: 3px 0; }
+.ai-engine dl { display: grid; grid-template-columns: 1fr auto; gap: 5px 10px; margin: 8px 0; }
+.ai-engine dd { margin: 0; color: #e6e7d7; text-align: right; }
+.ai-engine small { color: #91a08e; font-size: 10px; }
+.ai-pipeline { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 0; margin: 10px 0; list-style: none; }
+.ai-pipeline li { display: flex; align-items: center; gap: 7px; padding: 7px 8px; border: 1px solid #ffffff15; border-radius: 4px; font-size: 10px; color: #9fac99; transition: color .15s, background .15s; }
+.ai-pipeline li span { color: #b5a580; font-size: 10px; }
+.ai-pipeline .is-current { color: #f0dfbb; background: #ba9d6520; border-color: #b69b6555; }
+.ai-pipeline .is-done { color: #c2d5b8; }
+.ai-search-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; padding: 8px 0 10px; border-bottom: 1px solid #ffffff18; color: #aab8a5; font-size: 10px; }
+.ai-search-stats span { display: flex; justify-content: space-between; gap: 6px; }
+.ai-search-stats strong { color: #e7d5ae; font-weight: 600; }
+.ai-search-stats__meter { grid-column: 1 / -1; margin-top: 3px; }
+.ai-console__summary { font-size: 10px; margin: 8px 0 12px; }
+.ai-console__candidates { gap: 8px; margin-bottom: 12px; }
+.ai-console__prior { margin-top: 4px; color: #aebba8; font-size: 10px; }
+.ai-console__prior span { padding: 0 5px; color: #d1b880; }
+.ai-repetition { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; margin-top: 14px; padding-top: 9px; border-top: 1px solid #ffffff19; color: #bac8b3; font-size: 10px; }
+.ai-repetition strong { color: #ddc69a; }
+.ai-repetition small { flex-basis: 100%; color: #8e9e88; font-size: 9px; }
 .ai-console__candidate-line { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 5px; color: #e9ecdf; }
 .ai-console__candidate-line em { display: inline-grid; width: 18px; height: 18px; place-items: center; margin-right: 5px; border-radius: 3px; background: #3b493d; color: #dbd0ac; font-size: 10px; font-style: normal; }
 .ai-console__candidate-line strong { color: #d9c193; font-size: 11px; white-space: nowrap; }
