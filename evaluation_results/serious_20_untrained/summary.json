@@ -1,0 +1,93 @@
+{
+  "games": 24,
+  "wins": 0,
+  "losses": 0,
+  "draws": 22,
+  "truncations": 2,
+  "completed_games": 22,
+  "completed_game_score": 0.5,
+  "all_game_score_bounds": [
+    0.4583333333333333,
+    0.5416666666666666
+  ],
+  "average_plies": 184.20833333333334,
+  "terminal_reasons": {
+    "repetition": 22
+  },
+  "pairs": [
+    {
+      "opening_id": "initial",
+      "games": 2,
+      "resolved": false,
+      "candidate_score": null
+    },
+    {
+      "opening_id": "opening-001",
+      "games": 2,
+      "resolved": true,
+      "candidate_score": 0.5
+    },
+    {
+      "opening_id": "opening-002",
+      "games": 2,
+      "resolved": true,
+      "candidate_score": 0.5
+    },
+    {
+      "opening_id": "opening-003",
+      "games": 2,
+      "resolved": true,
+      "candidate_score": 0.5
+    },
+    {
+      "opening_id": "opening-004",
+      "games": 2,
+      "resolved": true,
+      "candidate_score": 0.5
+    },
+    {
+      "opening_id": "opening-005",
+      "games": 2,
+      "resolved": true,
+      "candidate_score": 0.5
+    },
+    {
+      "opening_id": "opening-006",
+      "games": 2,
+      "resolved": false,
+      "candidate_score": null
+    },
+    {
+      "opening_id": "opening-007",
+      "games": 2,
+      "resolved": true,
+      "candidate_score": 0.5
+    },
+    {
+      "opening_id": "opening-008",
+      "games": 2,
+      "resolved": true,
+      "candidate_score": 0.5
+    },
+    {
+      "opening_id": "opening-009",
+      "games": 2,
+      "resolved": true,
+      "candidate_score": 0.5
+    },
+    {
+      "opening_id": "opening-010",
+      "games": 2,
+      "resolved": true,
+      "candidate_score": 0.5
+    },
+    {
+      "opening_id": "opening-011",
+      "games": 2,
+      "resolved": true,
+      "candidate_score": 0.5
+    }
+  ],
+  "statistics_note": "Fixed-suite descriptive results. Bounds account for unresolved truncations, not statistical uncertainty. Paired games are not independent samples; no IID confidence interval or Elo is claimed.",
+  "elapsed_seconds": 627.5845856000087
+}

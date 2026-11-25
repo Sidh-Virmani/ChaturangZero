@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "openings": [
+    {
+      "id": "initial",
+      "moves": []
+    },
+    {
+      "id": "opening-001",
+      "moves": [
+        "b1c3",
+        "d7d6",
+        "g2g3",
+        "g8f6"
+      ]
+    },
+    {
+      "id": "opening-002",
+      "moves": [
+        "c1a3",
+        "h7h6",
+        "a3c1",
+        "d7d6",
+        "d2d3"
+      ]
+    },
+    {
+      "id": "opening-003",
+      "moves": [
+        "g1h3",
+        "c7c6",
+        "a2a3",
+        "g8f6",
+        "h3g1",
+        "h7h6"
+      ]
+    },
+    {
+      "id": "opening-004",
+      "moves": [
+        "g1f3",
+        "g7g6",
+        "e2e3",
+        "d7d6",
+        "d2d3",
+        "g6g5",
+        "b2b3"
+      ]
+    },
+    {
+      "id": "opening-005",
+      "moves": [
+        "c2c3",
+        "f8h6",
+        "d1c2",
+        "c8e6",
+        "g1f3",
+        "c7c6",
+        "c1a3",
+        "f7f6"
+      ]
+    },
+    {
+      "id": "opening-006",
+      "moves": [
+        "c1e3",
+        "f8h6",
+        "d2d3",
+        "d7d6",
+        "g1f3",
+        "b8d7",
+        "g2g3",
+        "b7b6",
+        "e1d2"
+      ]
+    },
+    {
+      "id": "opening-007",
+      "moves": [
+        "c1e3",
+        "b8c6",
+        "f2f3",
+        "g8f6",
+        "d2d3",
+        "h7h6",
+        "e3c5",
+        "h8g8",
+        "b2b3",
+        "f6g4"
+      ]
+    },
+    {
+      "id": "opening-008",
+      "moves": [
+        "f1d3",
+        "c8a6",
+        "c1a3",
+        "d8c8",
+        "g1f3",
+        "c8d8",
+        "c2c3",
+        "b8c6",
+        "d3b5",
+        "a6c8",
+        "b5d7"
+      ]
+    },
+    {
+      "id": "opening-009",
+      "moves": [
+        "g1h3",
+        "h7h6",
+        "h3f4",
+        "c8a6",
+        "f4d3",
+        "f8d6",
+        "c1a3",
+        "d6b4",
+        "f1h3",
+        "e7e6",
+        "e2e3",
+        "h8h7"
+      ]
+    },
+    {
+      "id": "opening-010",
+      "moves": [
+        "c2c3",
+        "h7h6",
+        "h2h3",
+        "h8h7"
+      ]
+    },
+    {
+      "id": "opening-011",
+      "moves": [
+        "c1a3",
+        "f8d6",
+        "f1d3",
+        "b8c6",
+        "g1h3"
+      ]
+    }
+  ]
+}
